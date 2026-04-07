@@ -9,6 +9,8 @@ import bookRoutes from './modules/books/book.routes.js';
 import exchangeRoutes from './modules/exchanges/exchange.routes.js';
 import reviewRoutes from './modules/reviews/review.routes.js';
 import wishlistRoutes from './modules/wishlist/wishlist.routes.js';
+import pointRoutes from './modules/points/point.routes.js';
+import reportRoutes from './modules/reports/report.routes.js';
 
 const app = express();
 connectDB();
@@ -27,8 +29,8 @@ app.use('/api/books', bookRoutes);
 app.use('/api/requests', exchangeRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/wishlist', wishlistRoutes);
-app.use('/api/points', tempRouter);
-app.use('/api/reports', tempRouter);
+app.use('/api/points', pointRoutes);
+app.use('/api/reports', reportRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
