@@ -7,6 +7,8 @@ import connectDB from './config/db.js';
 import userRoutes from './modules/users/user.routes.js';
 import bookRoutes from './modules/books/book.routes.js';
 import exchangeRoutes from './modules/exchanges/exchange.routes.js';
+import reviewRoutes from './modules/reviews/review.routes.js';
+import wishlistRoutes from './modules/wishlist/wishlist.routes.js';
 
 const app = express();
 connectDB();
@@ -23,8 +25,8 @@ tempRouter.get('/', (req, res) => {
 app.use('/api/users', userRoutes);
 app.use('/api/books', bookRoutes);
 app.use('/api/requests', exchangeRoutes);
-app.use('/api/reviews', tempRouter);
-app.use('/api/wishlist', tempRouter);
+app.use('/api/reviews', reviewRoutes);
+app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/points', tempRouter);
 app.use('/api/reports', tempRouter);
 
