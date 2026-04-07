@@ -5,3 +5,5 @@ export { ClerkExpressRequireAuth };
 export const getUserId = (req) => {
     return req.auth.userId;
 };
+
+export const requireAuth = ClerkExpressRequireAuth();
