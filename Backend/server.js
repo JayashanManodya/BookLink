@@ -4,6 +4,7 @@ dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import connectDB from './config/db.js';
+import userRoutes from './modules/users/user.routes.js';
 
 const app = express();
 connectDB();
@@ -17,7 +18,7 @@ tempRouter.get('/', (req, res) => {
     res.json({ message: 'module coming soon' });
 });
 
-app.use('/api/users', tempRouter);
+app.use('/api/users', userRoutes);
 app.use('/api/books', tempRouter);
 app.use('/api/requests', tempRouter);
 app.use('/api/reviews', tempRouter);
