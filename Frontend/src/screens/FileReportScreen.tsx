@@ -13,7 +13,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { api } from '../lib/api';
+import { api, apiErrorMessage } from '../lib/api';
 import { alertOk } from '../lib/platformAlert';
 import type { ProfileStackParamList } from '../navigation/profileStackTypes';
 import {
@@ -32,6 +32,8 @@ type Props = NativeStackScreenProps<ProfileStackParamList, 'FileReport'>;
 export function FileReportScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const pre = route.params ?? {};
+  /** When opened from Requests etc., targets are set in the background — no raw IDs in the UI. */
+  const hideIdFields = Boolean(pre.reportedUserClerkId?.trim() || pre.reportedBookId?.trim());
   const [reason, setReason] = useState<string>(REPORT_REASONS[0]);
   const [description, setDescription] = useState('');
   const [reportedUserClerkId, setReportedUserClerkId] = useState(pre?.reportedUserClerkId ?? '');
@@ -101,7 +103,7 @@ export function FileReportScreen({ navigation, route }: Props) {
       });
       alertOk('Report filed', 'Thank you for helping keep BookLink safe.', () => navigation.goBack());
     } catch (e: unknown) {
-      alertOk('Error', e instanceof Error ? e.message : 'Could not submit');
+      alertOk('Error', apiErrorMessage(e, 'Could not submit'));
     } finally {
       setBusy(false);
     }
@@ -128,24 +130,28 @@ export function FileReportScreen({ navigation, route }: Props) {
             </Pressable>
           ))}
         </View>
-        <Text style={styles.label}>Reported user Clerk ID (optional if book below)</Text>
-        <TextInput
-          value={reportedUserClerkId}
-          onChangeText={setReportedUserClerkId}
-          placeholder="user_..."
-          placeholderTextColor={warmHaze}
-          style={styles.input}
-          autoCapitalize="none"
-        />
-        <Text style={styles.label}>Reported book Mongo ID (optional)</Text>
-        <TextInput
-          value={reportedBookId}
-          onChangeText={setReportedBookId}
-          placeholder="Book ObjectId"
-          placeholderTextColor={warmHaze}
-          style={styles.input}
-          autoCapitalize="none"
-        />
+        {hideIdFields ? null : (
+          <>
+            <Text style={styles.label}>Reported user Clerk ID (optional if book below)</Text>
+            <TextInput
+              value={reportedUserClerkId}
+              onChangeText={setReportedUserClerkId}
+              placeholder="user_..."
+              placeholderTextColor={warmHaze}
+              style={styles.input}
+              autoCapitalize="none"
+            />
+            <Text style={styles.label}>Reported book Mongo ID (optional)</Text>
+            <TextInput
+              value={reportedBookId}
+              onChangeText={setReportedBookId}
+              placeholder="Book ObjectId"
+              placeholderTextColor={warmHaze}
+              style={styles.input}
+              autoCapitalize="none"
+            />
+          </>
+        )}
         <Text style={styles.label}>Description</Text>
         <TextInput
           value={description}

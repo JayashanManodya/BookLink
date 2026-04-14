@@ -17,6 +17,8 @@ export type ExchangeRequest = {
   meetupScheduledAt?: string | null;
   meetupContactNumber?: string;
   status: 'pending' | 'accepted' | 'rejected' | 'cancelled';
+  /** True when a review exists for this exchange (one per swap). */
+  hasExchangeReview?: boolean;
   createdAt?: string;
   updatedAt?: string;
 };

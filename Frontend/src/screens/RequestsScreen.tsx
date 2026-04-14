@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, apiErrorMessage } from '../lib/api';
@@ -56,10 +57,12 @@ export function RequestsScreen({ navigation }: Props) {
     }
   }, [tab]);
 
-  useEffect(() => {
-    if (!isSignedIn) return;
-    void load();
-  }, [isSignedIn, load]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!isSignedIn) return;
+      void load();
+    }, [isSignedIn, tab, load])
+  );
 
   const updateStatus = async (id: string, status: 'accepted' | 'rejected' | 'cancelled') => {
     try {
@@ -86,6 +89,21 @@ export function RequestsScreen({ navigation }: Props) {
       cancelLabel: 'No',
       confirmLabel: 'Cancel request',
       onConfirm: () => void updateStatus(id, 'cancelled'),
+    });
+  };
+
+  /** Opens Profile → File a report with this swap pre-filled (book + other participant). */
+  const openReportForExchange = (r: ExchangeRequest, role: 'sent' | 'received') => {
+    const reportedUserClerkId = role === 'sent' ? r.ownerClerkUserId : r.requesterClerkUserId;
+    const peerLabel = role === 'sent' ? r.ownerDisplayName || 'Lister' : r.requesterDisplayName || 'Reader';
+    const reportedLabel = `Exchange request · ${r.bookTitle || 'Book'} · ${peerLabel}`;
+    navigation.getParent()?.navigate('Profile', {
+      screen: 'FileReport',
+      params: {
+        reportedUserClerkId,
+        reportedBookId: r.bookId,
+        reportedLabel,
+      },
     });
   };
 
@@ -189,22 +207,43 @@ export function RequestsScreen({ navigation }: Props) {
                 {r.offeredBookPhoto ? (
                   <Image source={{ uri: r.offeredBookPhoto }} style={styles.offered} resizeMode="cover" />
                 ) : null}
-                {r.status === 'accepted' ? (
-                  <Pressable
-                    style={styles.reviewBtn}
-                    onPress={() =>
-                      navigation.navigate('WriteReview', {
-                        exchangeRequestId: r._id,
-                        revieweeClerkUserId:
-                          tab === 'sent' ? r.ownerClerkUserId : r.requesterClerkUserId,
-                        revieweeName:
-                          tab === 'sent'
-                            ? r.ownerDisplayName || 'Lister'
-                            : r.requesterDisplayName || 'Reader',
-                      })
-                    }
-                  >
-                    <Text style={styles.reviewTxt}>Leave a review</Text>
+                {tab === 'sent' && r.status === 'accepted' ? (
+                  <View style={styles.reviewReportBlock}>
+                    <View style={styles.reviewReportRow}>
+                      {!r.hasExchangeReview ? (
+                        <Pressable
+                          style={[styles.reviewBtn, styles.reviewReportHalf]}
+                          onPress={() =>
+                            navigation.navigate('WriteReview', {
+                              exchangeRequestId: r._id,
+                              revieweeClerkUserId: r.ownerClerkUserId,
+                              revieweeName: r.ownerDisplayName || 'Lister',
+                            })
+                          }
+                        >
+                          <Text style={styles.reviewTxt}>Leave a review</Text>
+                        </Pressable>
+                      ) : null}
+                      <Pressable
+                        style={[
+                          styles.reportBtn,
+                          r.hasExchangeReview ? styles.reportBtnFull : styles.reviewReportHalf,
+                        ]}
+                        onPress={() => openReportForExchange(r, 'sent')}
+                      >
+                        <Ionicons name="flag-outline" size={17} color={lead} />
+                        <Text style={styles.reportTxt}>Report</Text>
+                      </Pressable>
+                    </View>
+                    {r.hasExchangeReview ? (
+                      <Text style={styles.reviewDone}>You reviewed this exchange</Text>
+                    ) : null}
+                  </View>
+                ) : null}
+                {tab === 'received' && r.status === 'accepted' ? (
+                  <Pressable style={styles.reportBtnLister} onPress={() => openReportForExchange(r, 'received')}>
+                    <Ionicons name="flag-outline" size={17} color="#7a2e2e" />
+                    <Text style={styles.reportTxtLister}>Report an issue with this reader</Text>
                   </Pressable>
                 ) : null}
                 {tab === 'received' && r.status === 'pending' ? (
@@ -384,14 +423,49 @@ const styles = StyleSheet.create({
   },
   chatTxt: { fontSize: 14, fontWeight: '700', color: lead },
   offered: { width: '100%', height: 140, borderRadius: 12, marginTop: 4, backgroundColor: chineseSilver },
+  reviewReportBlock: { marginTop: 4, gap: 6 },
+  reviewReportRow: { flexDirection: 'row', gap: 8, alignItems: 'stretch' },
+  reviewReportHalf: { flex: 1, marginTop: 0 },
   reviewBtn: {
-    marginTop: 4,
     borderRadius: 14,
     paddingVertical: 12,
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: crunch,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
   },
   reviewTxt: { fontSize: 14, fontWeight: '800', color: lead },
+  reportBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 14,
+    paddingVertical: 12,
+    backgroundColor: cascadingWhite,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+  },
+  reportBtnFull: { flex: 1, alignSelf: 'stretch' },
+  reportTxt: { fontSize: 14, fontWeight: '800', color: lead },
+  reportBtnLister: {
+    marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 14,
+    paddingVertical: 12,
+    backgroundColor: '#fdeaea',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e8bcbc',
+  },
+  reportTxtLister: { fontSize: 14, fontWeight: '800', color: '#7a2e2e' },
+  reviewDone: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: textSecondary,
+  },
 });

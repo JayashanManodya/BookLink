@@ -57,14 +57,19 @@ export async function submitReview(req, res, next) {
     if (ex.requesterClerkUserId !== req.clerkUserId && ex.ownerClerkUserId !== req.clerkUserId) {
       return res.status(403).json({ error: 'Not part of this exchange' });
     }
-    const other =
-      ex.requesterClerkUserId === req.clerkUserId ? ex.ownerClerkUserId : ex.requesterClerkUserId;
+    /** One review per exchange: only the requester (person who receives the listed book) may review the lister. */
+    if (ex.requesterClerkUserId !== req.clerkUserId) {
+      return res.status(403).json({
+        error: 'Only the reader who requested this book can leave a review for this exchange',
+      });
+    }
+    const other = ex.ownerClerkUserId;
     if (typeof revieweeClerkUserId === 'string' && revieweeClerkUserId !== other) {
-      return res.status(400).json({ error: 'revieweeClerkUserId must be the other participant' });
+      return res.status(400).json({ error: 'revieweeClerkUserId must be the lister for this book' });
     }
     const dup = await Review.findOne({ exchangeRequestId }).lean();
     if (dup) {
-      return res.status(409).json({ error: 'A review already exists for this exchange' });
+      return res.status(409).json({ error: 'A review was already submitted for this exchange' });
     }
     try {
       const rev = await Review.create({
@@ -79,7 +84,7 @@ export async function submitReview(req, res, next) {
       return res.status(201).json({ review: serializeReview(rev, names) });
     } catch (e) {
       if (e?.code === 11000) {
-        return res.status(409).json({ error: 'A review already exists for this exchange' });
+        return res.status(409).json({ error: 'A review was already submitted for this exchange' });
       }
       throw e;
     }

@@ -13,7 +13,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { api } from '../lib/api';
+import { api, apiErrorMessage } from '../lib/api';
 import { alertOk } from '../lib/platformAlert';
 import type { RequestsStackParamList } from '../navigation/requestsStackTypes';
 import {
@@ -91,7 +91,7 @@ export function WriteReviewScreen({ navigation, route }: Props) {
       });
       alertOk('Thanks', 'Your review was posted.', () => navigation.goBack());
     } catch (e: unknown) {
-      alertOk('Error', e instanceof Error ? e.message : 'Could not submit');
+      alertOk('Error', apiErrorMessage(e, 'Could not submit'));
     } finally {
       setBusy(false);
     }
@@ -107,6 +107,7 @@ export function WriteReviewScreen({ navigation, route }: Props) {
       </View>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <Text style={styles.head}>Rate {revieweeName}</Text>
+        <Text style={styles.subHead}>One review per exchange. After you submit, you cannot add another for this swap.</Text>
         <Text style={styles.label}>Rating</Text>
         <View style={styles.starsRow}>
           {[1, 2, 3, 4, 5].map((n) => (
@@ -142,6 +143,7 @@ const styles = StyleSheet.create({
   backText: { fontSize: 16, fontWeight: '600', color: lead },
   scroll: { paddingHorizontal: 20, paddingBottom: 40, gap: 12, paddingTop: 8 },
   head: { fontSize: 22, fontWeight: '800', color: lead },
+  subHead: { fontSize: 14, color: textSecondary, lineHeight: 20, marginTop: 4 },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
   starsRow: { flexDirection: 'row', gap: 8 },
   starBtn: { fontSize: 32, color: dreamland },

@@ -64,16 +64,18 @@ function formatListedDate(iso?: string) {
   }
 }
 
-type SpecProps = { icon: keyof typeof Ionicons.glyphMap; label: string; value: string };
+type GlanceRowProps = { icon: keyof typeof Ionicons.glyphMap; label: string; value: string; showDivider: boolean };
 
-function SpecTile({ icon, label, value }: SpecProps) {
+function GlanceRow({ icon, label, value, showDivider }: GlanceRowProps) {
   return (
-    <View style={[styles.specTile, cardShadow]}>
-      <View style={styles.specIconWrap}>
-        <Ionicons name={icon} size={20} color={crunch} />
+    <View style={[styles.glanceRow, showDivider && styles.glanceRowDivider]}>
+      <View style={styles.glanceIconWrap}>
+        <Ionicons name={icon} size={18} color={crunch} />
       </View>
-      <Text style={styles.specLabel}>{label}</Text>
-      <Text style={styles.specValue} numberOfLines={3}>
+      <Text style={styles.glanceRowLabel} numberOfLines={1}>
+        {label}
+      </Text>
+      <Text style={styles.glanceRowValue} numberOfLines={2}>
         {value}
       </Text>
     </View>
@@ -264,15 +266,26 @@ export function BookDetailScreen({ navigation, route }: Props) {
           </Pressable>
 
           <Text style={styles.sectionLabel}>At a glance</Text>
-          <View style={styles.specGrid}>
-            <SpecTile icon="sparkles-outline" label="Condition" value={conditionLabel(book.condition) || 'good'} />
-            <SpecTile icon="language-outline" label="Language" value={book.language?.trim() || 'Not specified'} />
-            <SpecTile
+          <View style={[styles.glanceCard, cardShadow]}>
+            <GlanceRow
+              icon="sparkles-outline"
+              label="Condition"
+              value={conditionLabel(book.condition) || 'good'}
+              showDivider
+            />
+            <GlanceRow
+              icon="language-outline"
+              label="Language"
+              value={book.language?.trim() || 'Not specified'}
+              showDivider
+            />
+            <GlanceRow
               icon="calendar-outline"
               label="Year"
               value={book.year != null && Number.isFinite(book.year) ? String(book.year) : 'Not specified'}
+              showDivider
             />
-            <SpecTile icon="library-outline" label="Category" value={book.bookType || 'General'} />
+            <GlanceRow icon="library-outline" label="Category" value={book.bookType || 'General'} showDivider={false} />
           </View>
 
           <View style={[styles.locationCard, cardShadow]}>
@@ -452,33 +465,48 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
-  specGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+  glanceCard: {
     marginTop: 4,
-  },
-  specTile: {
-    width: '48%',
-    flexGrow: 1,
-    minWidth: '46%',
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 18,
     backgroundColor: cascadingWhite,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
-    gap: 6,
+    overflow: 'hidden',
   },
-  specIconWrap: {
+  glanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  glanceRowDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: dreamland,
+  },
+  glanceIconWrap: {
     width: 36,
     height: 36,
-    borderRadius: 12,
+    borderRadius: 10,
     backgroundColor: '#f5f0e6',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  specLabel: { fontSize: 11, fontWeight: '700', color: warmHaze, textTransform: 'uppercase', letterSpacing: 0.5 },
-  specValue: { fontSize: 15, fontWeight: '800', color: lead, lineHeight: 20 },
+  glanceRowLabel: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 15,
+    fontWeight: '700',
+    color: textSecondary,
+  },
+  glanceRowValue: {
+    flexShrink: 1,
+    maxWidth: '46%',
+    fontSize: 15,
+    fontWeight: '800',
+    color: lead,
+    textAlign: 'right',
+  },
   locationCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
