@@ -1,5 +1,9 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { chatIncoming, chatOutgoing, dreamland, lead, textSecondary, warmHaze } from '../theme/colors';
+import { platformElevation } from '../theme/shadows';
+
+const shadowMine = platformElevation({ offsetY: 1, opacity: 0.08, radius: 2, elevation: 1 });
+const shadowTheirs = platformElevation({ offsetY: 1, opacity: 0.07, radius: 3, elevation: 2 });
 
 export type ChatMessageRowProps = {
   mine: boolean;
@@ -141,20 +145,8 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(0,0,0,0.06)',
   },
-  shadowMine: {
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
-  },
-  shadowTheirs: {
-    shadowColor: '#000',
-    shadowOpacity: 0.07,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
-  },
+  shadowMine,
+  shadowTheirs,
   avatarPh: {
     alignItems: 'center',
     justifyContent: 'center',

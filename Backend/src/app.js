@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { clerkMiddleware } from '@clerk/express';
+import { connectDB } from './db.js';
 import bookRoutes from './routes/bookRoutes.js';
 import exchangeRequestRoutes from './routes/exchangeRequestRoutes.js';
 import userRoutes from './routes/userRoutes.js';
@@ -20,6 +21,14 @@ app.use(
   })
 );
 app.use(express.json({ limit: '2mb' }));
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
 app.use(clerkMiddleware());
 
 app.get('/api/health', (req, res) => {

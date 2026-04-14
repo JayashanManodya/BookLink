@@ -1,18 +1,19 @@
 import 'dotenv/config';
 import http from 'http';
-import mongoose from 'mongoose';
 import app from './src/app.js';
+import { connectDB } from './src/db.js';
 
 const port = Number(process.env.PORT || 5000);
-const uri = process.env.MONGODB_URI;
 
-if (!uri) {
+try {
+  await connectDB();
+} catch (e) {
+  // eslint-disable-next-line no-console
+  console.error(e?.message ?? e);
   // eslint-disable-next-line no-console
   console.error('Set MONGODB_URI in Backend/.env');
   process.exit(1);
 }
-
-await mongoose.connect(uri);
 // eslint-disable-next-line no-console
 console.log('MongoDB connected');
 
