@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { CommonActions } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@clerk/clerk-expo';
@@ -125,15 +126,16 @@ export function WishlistThreadChatScreen({ navigation, route }: Props) {
   const subtitle = useMemo(() => `About: ${itemTitle}`, [itemTitle]);
 
   const leaveChat = useCallback(() => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-      return;
-    }
     if (returnToChatsInbox) {
       navigation.getParent()?.navigate('Requests', { screen: 'ChatsInbox' });
       return;
     }
-    navigation.navigate('WishlistBoard');
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: 'WishlistChats' }],
+      })
+    );
   }, [navigation, returnToChatsInbox]);
 
   useFocusEffect(

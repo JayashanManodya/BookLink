@@ -13,6 +13,9 @@ export type ExchangeRequest = {
   meetupHandoffLabel?: string;
   meetupLatitude?: number | null;
   meetupLongitude?: number | null;
+  /** ISO string from API when meet-up is scheduled */
+  meetupScheduledAt?: string | null;
+  meetupContactNumber?: string;
   status: 'pending' | 'accepted' | 'rejected' | 'cancelled';
   createdAt?: string;
   updatedAt?: string;

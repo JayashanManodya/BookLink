@@ -139,7 +139,7 @@ export function BrowseListScreen({ navigation }: Props) {
             <Text style={styles.greetSub}>Explore the world of books</Text>
           </View>
           <Pressable style={styles.avatarCircle} onPress={() => navigation.navigate('AddBook')} hitSlop={8}>
-            <Ionicons name="person" size={16} color={lead} />
+            <Ionicons name="add" size={22} color={lead} />
           </Pressable>
         </View>
 
@@ -231,11 +231,15 @@ export function BrowseListScreen({ navigation }: Props) {
                   </Text>
                   <View style={styles.featureMetaRow}>
                     <View style={styles.listerRow}>
-                      <View style={styles.listerAvatar}>
-                        <Text style={styles.listerAvatarTxt}>
-                          {(b.ownerDisplayName || b.author || 'R').charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
+                      {b.ownerAvatarUrl ? (
+                        <Image source={{ uri: b.ownerAvatarUrl }} style={styles.listerAvatarImg} />
+                      ) : (
+                        <View style={styles.listerAvatar}>
+                          <Text style={styles.listerAvatarTxt}>
+                            {(b.ownerDisplayName || b.author || 'R').charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
                       <Text style={styles.featureSub} numberOfLines={1}>
                         {b.author}
                         {b.bookType ? ` · ${b.bookType}` : ''}
@@ -488,12 +492,20 @@ const styles = StyleSheet.create({
   },
   listerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 6 },
   listerAvatar: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: '#dfe3e8',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  listerAvatarImg: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: chineseSilver,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
   },
   listerAvatarTxt: { fontSize: 10, fontWeight: '800', color: lead },
   conditionChipLarge: {

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { COLLECTION_POINT_CITIES } from '../constants/collectionPointCities.js';
 import { CollectionPoint } from '../models/CollectionPoint.js';
 
 function escapeRegex(s) {
@@ -23,13 +24,17 @@ export async function submitPoint(req, res, next) {
     if (!name || typeof name !== 'string' || !city || typeof city !== 'string' || !address || typeof address !== 'string') {
       return res.status(400).json({ error: 'name, city, and address are required' });
     }
+    const cityTrim = city.trim();
+    if (!COLLECTION_POINT_CITIES.includes(cityTrim)) {
+      return res.status(400).json({ error: 'city must be chosen from the supported city list' });
+    }
     const coords = parseLatLng(req.body);
     if (!coords.ok) {
       return res.status(400).json({ error: coords.error });
     }
     const point = await CollectionPoint.create({
       name: name.trim(),
-      city: city.trim(),
+      city: cityTrim,
       address: address.trim(),
       association: typeof association === 'string' ? association.trim() : '',
       locationPhoto: typeof locationPhoto === 'string' ? locationPhoto.trim() : '',

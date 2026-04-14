@@ -66,6 +66,8 @@ function serializeRequest(doc, bookLean, profileById = {}) {
     meetupHandoffLabel: o.meetupHandoffLabel || '',
     meetupLatitude: typeof o.meetupLatitude === 'number' ? o.meetupLatitude : null,
     meetupLongitude: typeof o.meetupLongitude === 'number' ? o.meetupLongitude : null,
+    meetupScheduledAt: o.meetupScheduledAt ? new Date(o.meetupScheduledAt).toISOString() : null,
+    meetupContactNumber: o.meetupContactNumber || '',
     status: o.status,
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,
@@ -259,15 +261,41 @@ export async function updateExchangeRequestStatus(req, res, next) {
   }
 }
 
+function parseMeetupAt(raw) {
+  if (raw == null) return { ok: false, error: 'meetupAt is required (ISO date-time)' };
+  const d = new Date(typeof raw === 'string' ? raw.trim() : raw);
+  if (Number.isNaN(d.getTime())) {
+    return { ok: false, error: 'meetupAt must be a valid date and time' };
+  }
+  return { ok: true, date: d };
+}
+
+function normalizeMeetupContact(raw) {
+  if (typeof raw !== 'string') return { ok: false, error: 'meetupContactNumber is required' };
+  const t = raw.trim().replace(/\s+/g, ' ');
+  if (t.length < 5 || t.length > 40) {
+    return { ok: false, error: 'meetupContactNumber must be 5–40 characters' };
+  }
+  return { ok: true, value: t };
+}
+
 export async function setExchangeRequestMeetup(req, res, next) {
   try {
     const { id } = req.params;
-    const { collectionPointId } = req.body ?? {};
+    const { collectionPointId, meetupAt, meetupContactNumber } = req.body ?? {};
     if (!mongoose.isValidObjectId(id)) {
       return res.status(400).json({ error: 'Invalid id' });
     }
     if (!collectionPointId || !mongoose.isValidObjectId(String(collectionPointId))) {
       return res.status(400).json({ error: 'valid collectionPointId is required' });
+    }
+    const when = parseMeetupAt(meetupAt);
+    if (!when.ok) {
+      return res.status(400).json({ error: when.error });
+    }
+    const phone = normalizeMeetupContact(meetupContactNumber);
+    if (!phone.ok) {
+      return res.status(400).json({ error: phone.error });
     }
     const row = await ExchangeRequest.findById(id);
     if (!row) {
@@ -288,11 +316,21 @@ export async function setExchangeRequestMeetup(req, res, next) {
     row.meetupHandoffLabel = meetupHandoffLabel;
     row.meetupLatitude = typeof point.latitude === 'number' ? point.latitude : undefined;
     row.meetupLongitude = typeof point.longitude === 'number' ? point.longitude : undefined;
+    row.meetupScheduledAt = when.date;
+    row.meetupContactNumber = phone.value;
     await row.save();
 
     const book = await Book.findById(row.bookId).select({ ownerDisplayName: 1 }).lean();
     const senderDisplayName = book?.ownerDisplayName || 'Reader';
-    const text = `Meet-up: ${meetupHandoffLabel}`;
+    const whenStr = when.date.toLocaleString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    const text = `Meet-up: ${meetupHandoffLabel}\nWhen: ${whenStr}\nContact: ${phone.value}`;
     await ExchangeMessage.create({
       requestId: id,
       senderClerkUserId: req.clerkUserId,

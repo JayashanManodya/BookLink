@@ -13,6 +13,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CityDictionarySelect } from '../components/CityDictionarySelect';
 import { LocationMapPicker } from '../components/LocationMapPicker';
 import { api } from '../lib/api';
 import { alertOk } from '../lib/platformAlert';
@@ -151,7 +152,7 @@ export function SubmitPointScreen({ navigation }: Props) {
         />
         <Text style={styles.detailsTitle}>Place details</Text>
         <Field label="Name" value={name} onChange={setName} />
-        <Field label="City" value={city} onChange={setCity} />
+        <CityDictionarySelect value={city} onChange={setCity} />
         <Field label="Address" value={address} onChange={setAddress} multiline />
         <Field label="Association (optional)" value={association} onChange={setAssociation} />
         <Field label="Hours (optional)" value={operatingHours} onChange={setOperatingHours} />

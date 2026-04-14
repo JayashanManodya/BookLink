@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  LayoutAnimation,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  UIManager,
   View,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -17,6 +20,7 @@ import type { BrowseStackParamList } from '../navigation/browseStackTypes';
 import { SignInWithGoogleButton } from '../components/SignInWithGoogleButton';
 import {
   cascadingWhite,
+  chineseSilver,
   crunch,
   dreamland,
   lead,
@@ -25,6 +29,10 @@ import {
 } from '../theme/colors';
 import { cardShadow } from '../theme/shadows';
 import type { Book } from '../types/book';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'BookDetail'>;
 
@@ -41,6 +49,37 @@ function conditionStyle(value?: string) {
   return { bg: '#ffc8c8', fg: '#8a1f1f' };
 }
 
+function initialsFromName(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
+  if (parts.length === 0) return 'R';
+  return parts.map((p) => p[0]?.toUpperCase() ?? '').join('') || 'R';
+}
+
+function formatListedDate(iso?: string) {
+  if (!iso) return null;
+  try {
+    return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return null;
+  }
+}
+
+type SpecProps = { icon: keyof typeof Ionicons.glyphMap; label: string; value: string };
+
+function SpecTile({ icon, label, value }: SpecProps) {
+  return (
+    <View style={[styles.specTile, cardShadow]}>
+      <View style={styles.specIconWrap}>
+        <Ionicons name={icon} size={20} color={crunch} />
+      </View>
+      <Text style={styles.specLabel}>{label}</Text>
+      <Text style={styles.specValue} numberOfLines={3}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 export function BookDetailScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { isSignedIn, userId } = useAuth();
@@ -48,9 +87,9 @@ export function BookDetailScreen({ navigation, route }: Props) {
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'details'>('overview');
   const [ratingScore, setRatingScore] = useState<number | null>(null);
   const [ratingCount, setRatingCount] = useState<number>(0);
+  const [descExpanded, setDescExpanded] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -100,13 +139,25 @@ export function BookDetailScreen({ navigation, route }: Props) {
 
   const isOwn = Boolean(book && userId && book.ownerClerkUserId === userId);
   const condTheme = conditionStyle(book?.condition);
-  const detailSummary = useMemo(() => {
-    if (!book) return '';
-    const parts = [book.bookType, conditionLabel(book.condition), book.language, book.year ? String(book.year) : '']
-      .filter(Boolean)
-      .join(' · ');
-    return parts || 'Community listing';
-  }, [book]);
+  const listedDate = book ? formatListedDate(book.createdAt) : null;
+  const ownerName = book?.ownerDisplayName || 'Community member';
+  const descRaw = book?.description?.trim() ?? '';
+  const descLong = descRaw.length > 220;
+  const descShown =
+    descRaw && (!descLong || descExpanded) ? descRaw : descLong ? `${descRaw.slice(0, 220).trim()}…` : '';
+
+  const openReviews = () => {
+    if (!book?.ownerClerkUserId) return;
+    navigation.navigate('UserReviews', {
+      clerkUserId: book.ownerClerkUserId,
+      displayName: ownerName,
+    });
+  };
+
+  const toggleDesc = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setDescExpanded((e) => !e);
+  };
 
   return (
     <View style={styles.flex}>
@@ -121,81 +172,146 @@ export function BookDetailScreen({ navigation, route }: Props) {
         >
           <View style={[styles.heroCard, cardShadow]}>
             <View style={styles.heroTopIcons}>
-              <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={styles.heroIconBtn}>
-                <Ionicons name="chevron-back" size={18} color={cascadingWhite} />
+              <Pressable
+                onPress={() => navigation.goBack()}
+                hitSlop={12}
+                style={({ pressed }) => [styles.heroIconBtn, pressed && styles.pressedHeroBtn]}
+              >
+                <Ionicons name="chevron-back" size={20} color={cascadingWhite} />
               </Pressable>
-              <View style={styles.heroIconBtn}>
-                <Ionicons name="bookmark-outline" size={16} color={cascadingWhite} />
-              </View>
             </View>
             {book.coverImageUrl ? (
               <Image source={{ uri: book.coverImageUrl }} style={styles.cover} resizeMode="cover" />
             ) : (
               <View style={styles.coverPlaceholder}>
-                <Ionicons name="book-outline" size={48} color={cascadingWhite} />
+                <Ionicons name="book-outline" size={52} color={cascadingWhite} />
               </View>
             )}
             <View style={styles.heroOverlay}>
-              <View>
-                <Text style={styles.heroTitle} numberOfLines={1}>
-                  {book.title}
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={styles.heroAuthor} numberOfLines={1}>
+                  {book.author}
                 </Text>
-                <Text style={styles.heroSub} numberOfLines={1}>
-                  <Ionicons name="location-outline" size={11} color="#d7e5f6" /> {book.location || 'Location not specified'}
+                <Text style={styles.heroSub} numberOfLines={2}>
+                  <Ionicons name="location-outline" size={12} color="#d7e5f6" />{' '}
+                  {book.location || 'Location not specified'}
                 </Text>
               </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.priceLabel}>Lister rating</Text>
-                <Text style={styles.priceValue}>{ratingScore != null ? ratingScore.toFixed(1) : 'N/A'}</Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.tabsRow}>
-            <Pressable onPress={() => setActiveTab('overview')}>
-              <Text style={[styles.tabText, activeTab === 'overview' && styles.tabTextOn]}>Overview</Text>
-            </Pressable>
-            <Pressable onPress={() => setActiveTab('details')}>
-              <Text style={[styles.tabText, activeTab === 'details' && styles.tabTextOn]}>Details</Text>
-            </Pressable>
-          </View>
-
-          {activeTab === 'overview' ? (
-            <>
-              <View style={styles.metricsRow}>
-                <View style={[styles.metricChip, { backgroundColor: condTheme.bg }]}>
-                  <Ionicons name="time-outline" size={13} color={lead} />
-                  <Text style={[styles.metricText, { color: condTheme.fg }]}>{book.condition || 'good'}</Text>
-                </View>
-                <View style={styles.metricChip}>
-                  <Ionicons name="book-outline" size={13} color={lead} />
-                  <Text style={styles.metricText}>{book.bookType || 'General'}</Text>
-                </View>
-                <View style={styles.metricChip}>
-                  <Ionicons name="star" size={12} color={lead} />
-                  <Text style={styles.metricText}>
-                    {ratingScore != null ? `${ratingScore.toFixed(1)} (${ratingCount})` : 'No ratings'}
+              <View style={styles.heroRatingCol}>
+                {book.ownerAvatarUrl ? (
+                  <Image source={{ uri: book.ownerAvatarUrl }} style={styles.heroListerPhoto} />
+                ) : (
+                  <View style={[styles.heroListerPhoto, styles.heroListerPhotoFallback]}>
+                    <Text style={styles.heroListerPhotoTxt}>{initialsFromName(ownerName)}</Text>
+                  </View>
+                )}
+                <Text style={styles.priceLabel}>Lister</Text>
+                <View style={styles.heroStarsRow}>
+                  <Ionicons name="star" size={14} color="#f4c025" />
+                  <Text style={styles.priceValue}>
+                    {ratingScore != null ? ratingScore.toFixed(1) : isSignedIn ? '—' : '·'}
                   </Text>
                 </View>
+                {ratingCount > 0 ? (
+                  <Text style={styles.heroReviewCount}>{ratingCount} review{ratingCount === 1 ? '' : 's'}</Text>
+                ) : isSignedIn ? (
+                  <Text style={styles.heroReviewCount}>No reviews yet</Text>
+                ) : (
+                  <Text style={styles.heroReviewCount}>Sign in to view</Text>
+                )}
               </View>
-
-              <Text style={styles.bodyText}>
-                {book.description?.trim()
-                  ? book.description.trim()
-                  : `This copy is listed by ${book.ownerDisplayName || 'a community member'} and can be requested directly.`}
-              </Text>
-            </>
-          ) : (
-            <View style={styles.detailsCard}>
-              <Text style={styles.detailLine}>Author: {book.author}</Text>
-              <Text style={styles.detailLine}>Type: {book.bookType || 'General'}</Text>
-              <Text style={styles.detailLine}>Condition: {conditionLabel(book.condition) || 'good'}</Text>
-              <Text style={styles.detailLine}>Language: {book.language || 'Not specified'}</Text>
-              <Text style={styles.detailLine}>Location: {book.location || 'Not specified'}</Text>
-              <Text style={styles.detailLine}>Listed by: {book.ownerDisplayName || 'Community member'}</Text>
-              <Text style={styles.detailSub}>{detailSummary}</Text>
             </View>
-          )}
+          </View>
+
+          <View style={styles.titleBlock}>
+            <Text style={styles.pageTitle}>{book.title}</Text>
+            <Text style={styles.pageAuthor}>by {book.author}</Text>
+          </View>
+
+          <Pressable
+            style={({ pressed }) => [styles.listerCard, cardShadow, pressed && styles.pressedCard]}
+            onPress={() => {
+              if (isSignedIn && book.ownerClerkUserId) openReviews();
+            }}
+            disabled={!isSignedIn || !book.ownerClerkUserId}
+            android_ripple={{ color: 'rgba(0,0,0,0.06)' }}
+          >
+            <View style={styles.listerAvatarWrap}>
+              {book.ownerAvatarUrl ? (
+                <Image source={{ uri: book.ownerAvatarUrl }} style={styles.listerAvatar} />
+              ) : (
+                <View style={[styles.listerAvatar, styles.listerAvatarFallback]}>
+                  <Text style={styles.listerAvatarTxt}>{initialsFromName(ownerName)}</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.listerMeta}>
+              <Text style={styles.listerName}>{ownerName}</Text>
+              <Text style={styles.listerHint}>Listed this book{listedDate ? ` · ${listedDate}` : ''}</Text>
+              <View style={styles.listerRatingRow}>
+                <Ionicons name="star" size={16} color="#f4c025" />
+                <Text style={styles.listerRatingTxt}>
+                  {ratingScore != null ? `${ratingScore.toFixed(1)} out of 5` : isSignedIn ? 'No rating yet' : 'Sign in to see rating'}
+                </Text>
+              </View>
+            </View>
+            {isSignedIn && book.ownerClerkUserId ? (
+              <View style={styles.listerChevron}>
+                <Text style={styles.reviewsLink}>Reviews</Text>
+                <Ionicons name="chevron-forward" size={20} color={warmHaze} />
+              </View>
+            ) : null}
+          </Pressable>
+
+          <Text style={styles.sectionLabel}>At a glance</Text>
+          <View style={styles.specGrid}>
+            <SpecTile icon="sparkles-outline" label="Condition" value={conditionLabel(book.condition) || 'good'} />
+            <SpecTile icon="language-outline" label="Language" value={book.language?.trim() || 'Not specified'} />
+            <SpecTile
+              icon="calendar-outline"
+              label="Year"
+              value={book.year != null && Number.isFinite(book.year) ? String(book.year) : 'Not specified'}
+            />
+            <SpecTile icon="library-outline" label="Category" value={book.bookType || 'General'} />
+          </View>
+
+          <View style={[styles.locationCard, cardShadow]}>
+            <Ionicons name="navigate-outline" size={22} color={crunch} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.locationLabel}>Meet-up area</Text>
+              <Text style={styles.locationValue}>{book.location?.trim() || 'Ask the lister in your request'}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.sectionLabel}>About this copy</Text>
+          <View style={[styles.aboutCard, cardShadow]}>
+            <Text style={styles.bodyText}>
+              {descRaw
+                ? descShown
+                : `This copy is listed by ${ownerName}. Send a request to start a conversation.`}
+            </Text>
+            {descLong ? (
+              <Pressable onPress={toggleDesc} style={styles.readMoreBtn} hitSlop={8}>
+                <Text style={styles.readMoreTxt}>{descExpanded ? 'Show less' : 'Read more'}</Text>
+                <Ionicons name={descExpanded ? 'chevron-up' : 'chevron-down'} size={16} color={crunch} />
+              </Pressable>
+            ) : null}
+          </View>
+
+          <View style={styles.metricsRow}>
+            <View style={[styles.metricChip, { backgroundColor: condTheme.bg }]}>
+              <Ionicons name="shield-checkmark-outline" size={14} color={lead} />
+              <Text style={[styles.metricText, { color: condTheme.fg }]}>{book.condition || 'good'}</Text>
+            </View>
+            <View style={styles.metricChip}>
+              <Ionicons name="pricetag-outline" size={14} color={lead} />
+              <Text style={styles.metricText}>{book.bookType || 'General'}</Text>
+            </View>
+            <View style={styles.metricChip}>
+              <Ionicons name="heart-outline" size={14} color={lead} />
+              <Text style={styles.metricText}>{book.listingStatus === 'available' ? 'Available' : 'Exchanged'}</Text>
+            </View>
+          </View>
 
           {isOwn ? (
             <Text style={styles.ownHint}>This is your listing. Manage it from My Listings.</Text>
@@ -209,11 +325,12 @@ export function BookDetailScreen({ navigation, route }: Props) {
             </View>
           ) : (
             <Pressable
-              style={styles.primaryBtn}
+              style={({ pressed }) => [styles.primaryBtn, pressed && styles.primaryBtnPressed]}
               onPress={() => navigation.navigate('RequestExchange', { bookId: book._id, title: book.title })}
+              android_ripple={{ color: 'rgba(255,255,255,0.2)' }}
             >
-              <Text style={styles.primaryBtnText}>Request Exchange</Text>
-              <Ionicons name="paper-plane-outline" size={16} color={cascadingWhite} />
+              <Text style={styles.primaryBtnText}>Request exchange</Text>
+              <Ionicons name="paper-plane-outline" size={18} color={cascadingWhite} />
             </Pressable>
           )}
         </ScrollView>
@@ -224,9 +341,9 @@ export function BookDetailScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: cascadingWhite },
-  scroll: { paddingHorizontal: 16, paddingBottom: 36, gap: 12 },
+  scroll: { paddingHorizontal: 16, paddingBottom: 40, gap: 10 },
   heroCard: {
-    borderRadius: 18,
+    borderRadius: 22,
     overflow: 'hidden',
     width: '100%',
     height: 300,
@@ -234,21 +351,22 @@ const styles = StyleSheet.create({
   },
   heroTopIcons: {
     position: 'absolute',
-    top: 10,
-    left: 10,
-    right: 10,
+    top: 12,
+    left: 12,
+    right: 12,
     zIndex: 2,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   },
   heroIconBtn: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.28)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  pressedHeroBtn: { opacity: 0.85 },
   cover: { width: '100%', height: '100%' },
   coverPlaceholder: {
     flex: 1,
@@ -261,58 +379,160 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(6, 27, 48, 0.55)',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    backgroundColor: 'rgba(6, 27, 48, 0.58)',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
   },
-  heroTitle: { fontSize: 14, fontWeight: '800', color: cascadingWhite },
-  heroSub: { marginTop: 2, fontSize: 11, color: '#d7e5f6' },
-  priceLabel: { fontSize: 10, color: '#d7e5f6' },
-  priceValue: { fontSize: 18, fontWeight: '800', color: cascadingWhite },
-  tabsRow: { flexDirection: 'row', gap: 14, marginTop: 2, alignItems: 'center' },
-  tabText: { fontSize: 13, color: '#8d8d8d', fontWeight: '700' },
-  tabTextOn: { color: lead },
-  metricsRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  heroAuthor: { fontSize: 15, fontWeight: '800', color: cascadingWhite },
+  heroSub: { marginTop: 6, fontSize: 12, color: '#d7e5f6', lineHeight: 17 },
+  heroRatingCol: { alignItems: 'flex-end' },
+  heroListerPhoto: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.92)',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  heroListerPhotoFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroListerPhotoTxt: { fontSize: 18, fontWeight: '800', color: cascadingWhite },
+  heroStarsRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  priceLabel: { fontSize: 11, color: '#d7e5f6', fontWeight: '600', marginBottom: 2 },
+  priceValue: { fontSize: 20, fontWeight: '800', color: cascadingWhite },
+  heroReviewCount: { marginTop: 2, fontSize: 11, color: '#b8cce8', fontWeight: '600' },
+  titleBlock: { marginTop: 4, gap: 4 },
+  pageTitle: { fontSize: 24, fontWeight: '800', color: lead, letterSpacing: -0.4, lineHeight: 30 },
+  pageAuthor: { fontSize: 16, fontWeight: '600', color: warmHaze },
+  listerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginTop: 6,
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: cascadingWhite,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+  },
+  pressedCard: { opacity: 0.92 },
+  listerAvatarWrap: {},
+  listerAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: chineseSilver,
+  },
+  listerAvatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+  },
+  listerAvatarTxt: { fontSize: 22, fontWeight: '800', color: lead },
+  listerMeta: { flex: 1, minWidth: 0 },
+  listerName: { fontSize: 18, fontWeight: '800', color: lead },
+  listerHint: { marginTop: 4, fontSize: 13, color: textSecondary, fontWeight: '600' },
+  listerRatingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  listerRatingTxt: { fontSize: 14, fontWeight: '700', color: lead },
+  listerChevron: { alignItems: 'flex-end', gap: 2 },
+  reviewsLink: { fontSize: 12, fontWeight: '800', color: crunch },
+  sectionLabel: {
+    marginTop: 18,
+    marginBottom: 2,
+    fontSize: 13,
+    fontWeight: '800',
+    color: lead,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
+  specGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 4,
+  },
+  specTile: {
+    width: '48%',
+    flexGrow: 1,
+    minWidth: '46%',
+    borderRadius: 16,
+    padding: 14,
+    backgroundColor: cascadingWhite,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+    gap: 6,
+  },
+  specIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#f5f0e6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  specLabel: { fontSize: 11, fontWeight: '700', color: warmHaze, textTransform: 'uppercase', letterSpacing: 0.5 },
+  specValue: { fontSize: 15, fontWeight: '800', color: lead, lineHeight: 20 },
+  locationCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+    marginTop: 4,
+    padding: 16,
+    borderRadius: 18,
+    backgroundColor: cascadingWhite,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+  },
+  locationLabel: { fontSize: 12, fontWeight: '700', color: warmHaze, textTransform: 'uppercase', letterSpacing: 0.4 },
+  locationValue: { marginTop: 4, fontSize: 16, fontWeight: '700', color: lead, lineHeight: 22 },
+  aboutCard: {
+    marginTop: 4,
+    padding: 18,
+    borderRadius: 18,
+    backgroundColor: cascadingWhite,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+    gap: 10,
+  },
+  bodyText: { fontSize: 15, lineHeight: 24, color: textSecondary, fontWeight: '500' },
+  readMoreBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginTop: 4 },
+  readMoreTxt: { fontSize: 14, fontWeight: '800', color: crunch },
+  metricsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   metricChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#f3f3f5',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  metricText: { fontSize: 12, color: lead, fontWeight: '700', textTransform: 'capitalize' },
-  bodyText: { marginTop: 8, fontSize: 12, lineHeight: 18, color: textSecondary },
-  detailsCard: {
-    marginTop: 4,
+    gap: 6,
+    backgroundColor: '#f3f1ed',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
-    backgroundColor: '#fafafa',
-    borderRadius: 12,
-    padding: 12,
-    gap: 6,
   },
-  detailLine: { fontSize: 13, color: lead },
-  detailSub: { marginTop: 4, fontSize: 12, color: warmHaze },
-  ownHint: { fontSize: 14, color: textSecondary },
+  metricText: { fontSize: 12, color: lead, fontWeight: '700', textTransform: 'capitalize' },
+  ownHint: { fontSize: 14, color: textSecondary, marginTop: 8, textAlign: 'center' },
   primaryBtn: {
-    marginTop: 10,
-    backgroundColor: '#121212',
-    borderRadius: 12,
-    paddingVertical: 13,
+    marginTop: 14,
+    backgroundColor: lead,
+    borderRadius: 16,
+    paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
-  primaryBtnText: { fontSize: 14, fontWeight: '800', color: cascadingWhite },
+  primaryBtnPressed: { opacity: 0.88 },
+  primaryBtnText: { fontSize: 16, fontWeight: '800', color: cascadingWhite },
   error: { color: '#b3261e', fontSize: 14, marginHorizontal: 20 },
   gateBox: {
-    marginTop: 8,
+    marginTop: 10,
     borderRadius: 20,
     padding: 18,
     backgroundColor: cascadingWhite,

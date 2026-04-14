@@ -15,6 +15,8 @@ const exchangeRequestSchema = new mongoose.Schema(
     meetupHandoffLabel: { type: String, trim: true, default: '' },
     meetupLatitude: { type: Number },
     meetupLongitude: { type: Number },
+    meetupScheduledAt: { type: Date },
+    meetupContactNumber: { type: String, trim: true, default: '' },
     status: {
       type: String,
       enum: ['pending', 'accepted', 'rejected', 'cancelled'],

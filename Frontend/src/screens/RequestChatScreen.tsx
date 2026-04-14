@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   BackHandler,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -41,6 +43,57 @@ import {
 
 type Props = NativeStackScreenProps<RequestsStackParamList, 'RequestChat'>;
 
+function pad2(n: number) {
+  return n < 10 ? `0${n}` : String(n);
+}
+
+function defaultMeetupDateStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function defaultMeetupTimeStr() {
+  const d = new Date();
+  d.setMinutes(0, 0, 0);
+  d.setHours(d.getHours() + 1);
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+/** Combine local date (YYYY-MM-DD) and time (HH:mm) into ISO UTC for the API. */
+function combineLocalDateTimeToISO(dateStr: string, timeStr: string): string | null {
+  const dPart = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
+  const tPart = /^(\d{1,2}):(\d{2})$/.exec(timeStr.trim());
+  if (!dPart || !tPart) return null;
+  const y = Number(dPart[1]);
+  const mo = Number(dPart[2]);
+  const day = Number(dPart[3]);
+  const hh = Number(tPart[1]);
+  const mm = Number(tPart[2]);
+  if (![y, mo, day, hh, mm].every((n) => Number.isFinite(n))) return null;
+  if (hh > 23 || hh < 0 || mm > 59 || mm < 0) return null;
+  const dt = new Date(y, mo - 1, day, hh, mm, 0, 0);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.toISOString();
+}
+
+function formatMeetupWhen(iso?: string | null) {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  } catch {
+    return '';
+  }
+}
+
 type ExchangeMessage = {
   _id: string;
   requestId: string;
@@ -65,6 +118,11 @@ export function RequestChatScreen({ navigation, route }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [meetupModal, setMeetupModal] = useState(false);
+  const [meetupStep, setMeetupStep] = useState<'pick' | 'details'>('pick');
+  const [selectedPoint, setSelectedPoint] = useState<CollectionPoint | null>(null);
+  const [meetupDateStr, setMeetupDateStr] = useState('');
+  const [meetupTimeStr, setMeetupTimeStr] = useState('');
+  const [meetupContactStr, setMeetupContactStr] = useState('');
   const [lightboxUri, setLightboxUri] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -148,22 +206,56 @@ export function RequestChatScreen({ navigation, route }: Props) {
     }
   };
 
-  const pickMeetup = async (p: CollectionPoint) => {
+  const closeMeetupModal = () => {
+    setMeetupModal(false);
+    setMeetupStep('pick');
+    setSelectedPoint(null);
+  };
+
+  const openMeetupModal = () => {
+    void loadPoints();
+    setMeetupStep('pick');
+    setSelectedPoint(null);
+    setMeetupDateStr(defaultMeetupDateStr());
+    setMeetupTimeStr(defaultMeetupTimeStr());
+    setMeetupContactStr('');
+    setMeetupModal(true);
+  };
+
+  const goMeetupDetails = (p: CollectionPoint) => {
+    setSelectedPoint(p);
+    setMeetupDateStr(defaultMeetupDateStr());
+    setMeetupTimeStr(defaultMeetupTimeStr());
+    setMeetupContactStr(p.contactNumber?.trim() || '');
+    setMeetupStep('details');
+  };
+
+  const confirmMeetup = async () => {
+    if (!selectedPoint) return;
+    const meetupAt = combineLocalDateTimeToISO(meetupDateStr, meetupTimeStr);
+    if (!meetupAt) {
+      Alert.alert('Date & time', 'Use date as YYYY-MM-DD and time as HH:mm (24-hour), e.g. 14:30.');
+      return;
+    }
+    const contact = meetupContactStr.trim();
+    if (contact.length < 5) {
+      Alert.alert('Contact', 'Enter a contact number (at least 5 characters).');
+      return;
+    }
     setMeetupBusy(true);
     try {
-      await api.patch(`/api/requests/${requestId}/meetup`, { collectionPointId: p._id });
-      setMeetupModal(false);
+      await api.patch(`/api/requests/${requestId}/meetup`, {
+        collectionPointId: selectedPoint._id,
+        meetupAt,
+        meetupContactNumber: contact,
+      });
+      closeMeetupModal();
       await load();
     } catch (e: unknown) {
       setError(apiErrorMessage(e, 'Could not set meet-up'));
     } finally {
       setMeetupBusy(false);
     }
-  };
-
-  const openMeetupModal = () => {
-    void loadPoints();
-    setMeetupModal(true);
   };
 
   const subtitle = useMemo(() => `About: ${bookTitle}`, [bookTitle]);
@@ -208,6 +300,25 @@ export function RequestChatScreen({ navigation, route }: Props) {
         <View style={styles.meetupBanner}>
           <Text style={styles.meetupLabel}>Meet-up</Text>
           <Text style={styles.meetupVal}>{request.meetupHandoffLabel}</Text>
+          {request.meetupScheduledAt ? (
+            <Text style={styles.meetupWhen}>
+              <Text style={styles.meetupMetaLabel}>When: </Text>
+              {formatMeetupWhen(request.meetupScheduledAt)}
+            </Text>
+          ) : null}
+          {request.meetupContactNumber ? (
+            <Pressable
+              onPress={() => {
+                const raw = request.meetupContactNumber ?? '';
+                const tel = raw.replace(/[^\d+]/g, '');
+                if (tel.length >= 5) void Linking.openURL(`tel:${tel}`);
+              }}
+              style={styles.meetupContactRow}
+            >
+              <Ionicons name="call-outline" size={17} color={lead} />
+              <Text style={styles.meetupContactTxt}>{request.meetupContactNumber}</Text>
+            </Pressable>
+          ) : null}
           {hasMapCoords(request.meetupLatitude ?? undefined, request.meetupLongitude ?? undefined) ? (
             <Pressable
               style={styles.dirBtn}
@@ -230,7 +341,10 @@ export function RequestChatScreen({ navigation, route }: Props) {
         </View>
       ) : request && isAccepted && isOwner ? (
         <View style={styles.meetupHint}>
-          <Text style={styles.meetupHintTxt}>Choose where to meet — tap below to pick a collection point.</Text>
+          <Text style={styles.meetupHintTxt}>
+            Set the meet-up: choose a collection point, then add date, time, and a contact number. That summary is
+            sent in chat for both of you.
+          </Text>
         </View>
       ) : request && !isAccepted ? (
         <View style={styles.pendingBanner}>
@@ -329,30 +443,100 @@ export function RequestChatScreen({ navigation, route }: Props) {
 
       <ChatImageLightbox uri={lightboxUri} visible={!!lightboxUri} onClose={() => setLightboxUri(null)} />
 
-      <Modal visible={meetupModal} animationType="slide" transparent onRequestClose={() => setMeetupModal(false)}>
+      <Modal visible={meetupModal} animationType="slide" transparent onRequestClose={closeMeetupModal}>
         <View style={styles.modalRoot}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setMeetupModal(false)} />
+          <Pressable style={styles.modalBackdrop} onPress={closeMeetupModal} />
           <View style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-            <Text style={styles.modalTitle}>Collection point</Text>
-            <ScrollView style={{ maxHeight: 400 }} keyboardShouldPersistTaps="handled">
-              {points.length === 0 ? (
-                <Text style={styles.emptyModal}>No points yet. Add one under Profile → Collection points.</Text>
-              ) : (
-                points.map((p) => (
+            {meetupStep === 'pick' ? (
+              <>
+                <Text style={styles.modalTitle}>Collection point</Text>
+                <ScrollView style={{ maxHeight: 400 }} keyboardShouldPersistTaps="handled">
+                  {points.length === 0 ? (
+                    <Text style={styles.emptyModal}>No points yet. Add one under Profile → Collection points.</Text>
+                  ) : (
+                    points.map((p) => (
+                      <Pressable key={p._id} style={styles.modalRow} onPress={() => goMeetupDetails(p)}>
+                        <Text style={styles.modalRowTitle}>{p.name}</Text>
+                        <Text style={styles.modalRowSub}>
+                          {p.city} · {p.address}
+                        </Text>
+                      </Pressable>
+                    ))
+                  )}
+                </ScrollView>
+              </>
+            ) : (
+              <>
+                <Text style={styles.modalTitle}>When & how to reach you</Text>
+                {selectedPoint ? (
+                  <View style={styles.detailsSummary}>
+                    <Text style={styles.detailsSummaryLabel}>Place</Text>
+                    <Text style={styles.detailsSummaryTxt}>
+                      {selectedPoint.name} · {selectedPoint.city}
+                    </Text>
+                    <Text style={styles.modalRowSub}>{selectedPoint.address}</Text>
+                  </View>
+                ) : null}
+                <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 360 }}>
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalFieldLabel}>Date</Text>
+                    <TextInput
+                      value={meetupDateStr}
+                      onChangeText={setMeetupDateStr}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={warmHaze}
+                      style={styles.modalInput}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalFieldLabel}>Time (24h)</Text>
+                    <TextInput
+                      value={meetupTimeStr}
+                      onChangeText={setMeetupTimeStr}
+                      placeholder="HH:mm"
+                      placeholderTextColor={warmHaze}
+                      style={styles.modalInput}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+                  <View style={styles.modalField}>
+                    <Text style={styles.modalFieldLabel}>Your contact number</Text>
+                    <TextInput
+                      value={meetupContactStr}
+                      onChangeText={setMeetupContactStr}
+                      placeholder="Shown to the other reader for this handoff"
+                      placeholderTextColor={warmHaze}
+                      style={styles.modalInput}
+                      keyboardType="phone-pad"
+                    />
+                  </View>
+                  <Text style={styles.modalHint}>Times use your device’s local timezone.</Text>
+                </ScrollView>
+                <View style={styles.modalActionsRow}>
                   <Pressable
-                    key={p._id}
-                    style={styles.modalRow}
-                    onPress={() => void pickMeetup(p)}
+                    style={styles.modalBackBtn}
+                    onPress={() => setMeetupStep('pick')}
                     disabled={meetupBusy}
                   >
-                    <Text style={styles.modalRowTitle}>{p.name}</Text>
-                    <Text style={styles.modalRowSub}>
-                      {p.city} · {p.address}
-                    </Text>
+                    <Text style={styles.modalBackBtnTxt}>Back</Text>
                   </Pressable>
-                ))
-              )}
-            </ScrollView>
+                  <Pressable
+                    style={[styles.modalConfirmBtn, meetupBusy && styles.modalConfirmBtnOff]}
+                    onPress={() => void confirmMeetup()}
+                    disabled={meetupBusy}
+                  >
+                    {meetupBusy ? (
+                      <ActivityIndicator color={cascadingWhite} size="small" />
+                    ) : (
+                      <Text style={styles.modalConfirmBtnTxt}>Send meet-up</Text>
+                    )}
+                  </Pressable>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -424,6 +608,22 @@ const styles = StyleSheet.create({
   },
   meetupLabel: { fontSize: 11, fontWeight: '800', color: warmHaze, textTransform: 'uppercase' },
   meetupVal: { fontSize: 15, fontWeight: '700', color: lead },
+  meetupWhen: { fontSize: 14, fontWeight: '600', color: lead, marginTop: 4, lineHeight: 20 },
+  meetupMetaLabel: { fontWeight: '800', color: warmHaze },
+  meetupContactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: cascadingWhite,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+  },
+  meetupContactTxt: { fontSize: 15, fontWeight: '800', color: lead },
   meetupHint: { marginHorizontal: 12, marginBottom: 6, padding: 10, borderRadius: 12, backgroundColor: '#f3f3f5' },
   meetupHintTxt: { fontSize: 13, color: textSecondary, lineHeight: 18 },
   pendingBanner: { marginHorizontal: 12, marginBottom: 6, padding: 10, borderRadius: 12, backgroundColor: '#faeeda' },
@@ -540,6 +740,50 @@ const styles = StyleSheet.create({
     maxHeight: '85%',
   },
   modalTitle: { fontSize: 18, fontWeight: '800', color: lead, marginBottom: 10 },
+  detailsSummary: {
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: '#f3f3f5',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+    gap: 4,
+  },
+  detailsSummaryLabel: { fontSize: 11, fontWeight: '800', color: warmHaze, textTransform: 'uppercase' },
+  detailsSummaryTxt: { fontSize: 15, fontWeight: '800', color: lead },
+  modalField: { marginBottom: 14 },
+  modalFieldLabel: { fontSize: 13, fontWeight: '800', color: warmHaze, marginBottom: 6 },
+  modalInput: {
+    backgroundColor: '#f3f3f5',
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: lead,
+  },
+  modalHint: { fontSize: 13, color: textSecondary, marginBottom: 8, lineHeight: 18 },
+  modalActionsRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
+  modalBackBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+    backgroundColor: cascadingWhite,
+  },
+  modalBackBtnTxt: { fontSize: 15, fontWeight: '800', color: lead },
+  modalConfirmBtn: {
+    flex: 2,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    backgroundColor: lead,
+  },
+  modalConfirmBtnOff: { opacity: 0.7 },
+  modalConfirmBtnTxt: { fontSize: 15, fontWeight: '800', color: cascadingWhite },
   modalRow: {
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,

@@ -1,5 +1,5 @@
 import { useEffect, type ComponentProps, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import {
   createBottomTabNavigator,
   type BottomTabBarProps,
@@ -13,8 +13,7 @@ import { BrowseStack } from './BrowseStack';
 import { ProfileStack } from './ProfileStack';
 import { RequestsStack } from './RequestsStack';
 import { WishlistStack } from './WishlistStack';
-import { cascadingWhite, iconOnLead, lead } from '../theme/colors';
-import { tabBarShadow } from '../theme/shadows';
+import { cascadingWhite, dreamland, lead, warmHaze } from '../theme/colors';
 
 export type MainTabParamList = {
   Browse: undefined;
@@ -23,13 +22,11 @@ export type MainTabParamList = {
   Profile: undefined;
 };
 
-/** Vertical inset top/bottom; bubble fits that inner height. */
-const GAP = 6;
-/** Left/right inset (0 = end icons flush to inner curve). */
-const GAP_H = 0;
-const TAB_BAR_HEIGHT = 68;
-const BUBBLE = TAB_BAR_HEIGHT - 2 * GAP;
-const TAB_OVERLAY_PAD = TAB_BAR_HEIGHT + 0;
+/** Content row height (icons + optional dot); safe area added below. */
+const TAB_BAR_CONTENT_MIN = 20;
+const TAB_BAR_VERTICAL_PAD = 4;
+const TAB_OVERLAY_PAD = TAB_BAR_CONTENT_MIN + TAB_BAR_VERTICAL_PAD * 2;
+const ACTIVE_DOT = '#e53935';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -48,9 +45,9 @@ function AuthApiSetup({ children }: { children: ReactNode }) {
 
 type IonName = ComponentProps<typeof Ionicons>['name'];
 
-/** Icons match each tab: Browse · Requests · Wishlist · Profile */
+/** Outline when idle, solid when active — travel-style tab bar. */
 function iconFor(routeName: string, focused: boolean): IonName {
-  if (routeName === 'Browse') return focused ? 'compass' : 'compass-outline';
+  if (routeName === 'Browse') return focused ? 'home' : 'home-outline';
   if (routeName === 'Requests') return focused ? 'swap-horizontal' : 'swap-horizontal-outline';
   if (routeName === 'Wishlist') return focused ? 'heart' : 'heart-outline';
   return focused ? 'person' : 'person-outline';
@@ -58,15 +55,16 @@ function iconFor(routeName: string, focused: boolean): IonName {
 
 function PillTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const bottom = Math.max(insets.bottom, 10);
+  const bottomPad = Math.max(insets.bottom, 8);
 
   return (
-    <View style={[styles.tabBarOuter, { paddingBottom: bottom }]}>
-      <View style={[styles.tabBarPill, tabBarShadow]}>
+    <View style={[styles.tabBarOuter, { paddingBottom: bottomPad }]}>
+      <View style={styles.tabBarInner}>
         {state.routes.map((route) => {
           const { options } = descriptors[route.key];
           const isFocused = state.routes[state.index]?.key === route.key;
           const ion = iconFor(route.name, isFocused);
+          const iconColor = isFocused ? lead : warmHaze;
 
           const onPress = () => {
             const event = navigation.emit({
@@ -93,17 +91,10 @@ function PillTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               onPress={onPress}
               onLongPress={onLongPress}
               style={styles.tabSlot}
-              hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+              hitSlop={{ top: 6, bottom: 4, left: 8, right: 8 }}
             >
-              {isFocused ? (
-                <View style={styles.activeBubble}>
-                  <Ionicons name={ion} size={24} color={lead} />
-                </View>
-              ) : (
-                <View style={styles.inactiveIconWrap}>
-                  <Ionicons name={ion} size={24} color={iconOnLead} />
-                </View>
-              )}
+              <Ionicons name={ion} size={26} color={iconColor} />
+              <View style={[styles.activeDot, !isFocused && styles.activeDotHidden]} />
             </Pressable>
           );
         })}
@@ -114,7 +105,7 @@ function PillTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
 export function MainTabs() {
   const insets = useSafeAreaInsets();
-  const contentBottomPad = TAB_OVERLAY_PAD + Math.max(insets.bottom, 10) + 12;
+  const contentBottomPad = TAB_OVERLAY_PAD + Math.max(insets.bottom, 8) + 8;
 
   return (
     <AuthApiSetup>
@@ -158,42 +149,46 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    alignItems: 'center',
     pointerEvents: 'box-none',
-    paddingTop: 10,
+    paddingTop: TAB_BAR_VERTICAL_PAD,
+    backgroundColor: '#ffffff',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: dreamland,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+      },
+      android: { elevation: 12 },
+      web: { boxShadow: '0px -2px 8px rgba(0, 0, 0, 0.06)' },
+      default: {},
+    }),
   },
-  tabBarPill: {
+  tabBarInner: {
     flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'center',
-    width: '78%',
-    maxWidth: 300,
-    height: TAB_BAR_HEIGHT,
-    paddingHorizontal: GAP_H,
-    paddingVertical: GAP,
-    backgroundColor: lead,
-    borderRadius: 999,
-    overflow: 'hidden',
+    alignItems: 'flex-start',
+    justifyContent: 'space-around',
+    minHeight: TAB_BAR_CONTENT_MIN,
+    paddingHorizontal: 4,
+    backgroundColor: '#ffffff',
   },
-  /** Equal columns; height comes from pill content box (after padding). */
   tabSlot: {
     flex: 1,
-    alignSelf: 'stretch',
+    maxWidth: 96,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 4,
+    gap: 4,
   },
-  activeBubble: {
-    width: BUBBLE,
-    height: BUBBLE,
-    borderRadius: BUBBLE / 2,
-    backgroundColor: cascadingWhite,
-    alignItems: 'center',
-    justifyContent: 'center',
+  activeDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: ACTIVE_DOT,
   },
-  inactiveIconWrap: {
-    width: BUBBLE,
-    height: BUBBLE,
-    justifyContent: 'center',
-    alignItems: 'center',
+  activeDotHidden: {
+    opacity: 0,
   },
 });

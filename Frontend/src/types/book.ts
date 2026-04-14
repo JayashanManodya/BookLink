@@ -10,6 +10,8 @@ export type Book = {
   coverImageUrl?: string;
   ownerClerkUserId?: string;
   ownerDisplayName?: string;
+  /** From API (Clerk); not stored on Book document. */
+  ownerAvatarUrl?: string;
   bookType?: BookType | string;
   collectionPointId?: string;
   handoffPointLabel?: string;

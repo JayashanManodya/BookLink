@@ -127,9 +127,6 @@ export function RequestsScreen({ navigation }: Props) {
           <Ionicons name="chatbubbles-outline" size={18} color={lead} />
           <Text style={styles.chatsPillTxt}>Chats</Text>
         </Pressable>
-        <Pressable onPress={() => void load()} style={styles.iconBtn} hitSlop={8} disabled={loading}>
-          <Text style={styles.refresh}>↻</Text>
-        </Pressable>
       </View>
       <View style={styles.tabs}>
         <Pressable onPress={() => setTab('received')} style={[styles.tab, tab === 'received' && styles.tabOn]}>
@@ -301,18 +298,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   chatsPillTxt: { fontSize: 14, fontWeight: '800', color: lead },
-  iconBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: cascadingWhite,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...cardShadow,
-  },
-  refresh: { fontSize: 22, color: lead, fontWeight: '700' },
   title: { fontSize: 28, fontWeight: '800', color: lead, letterSpacing: -0.5 },
   subtitle: { marginTop: 4, fontSize: 15, color: warmHaze, fontWeight: '600', maxWidth: '88%' },
   tabs: {

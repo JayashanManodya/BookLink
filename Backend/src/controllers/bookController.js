@@ -34,6 +34,28 @@ async function ownerDisplayNameFor(clerkUserId) {
   }
 }
 
+/** Profile image for book detail (Clerk); empty string on failure. */
+async function ownerAvatarUrlFor(clerkUserId) {
+  if (!clerkUserId || typeof clerkUserId !== 'string') return '';
+  try {
+    const user = await clerkClient.users.getUser(clerkUserId);
+    return typeof user.imageUrl === 'string' ? user.imageUrl : '';
+  } catch {
+    return '';
+  }
+}
+
+async function ownerAvatarsByClerkId(clerkUserIds) {
+  const unique = [...new Set(clerkUserIds.filter((id) => typeof id === 'string' && id.length > 0))];
+  const entries = await Promise.all(
+    unique.map(async (id) => {
+      const url = await ownerAvatarUrlFor(id);
+      return [id, url];
+    })
+  );
+  return Object.fromEntries(entries);
+}
+
 export async function listBooks(req, res, next) {
   try {
     const q = {};
@@ -79,7 +101,13 @@ export async function listBooks(req, res, next) {
     }
 
     const books = await Book.find(q).sort({ createdAt: -1 }).limit(80).lean();
-    return res.json({ books: books.map((b) => stripPublicBookFields(b)) });
+    const stripped = books.map((b) => stripPublicBookFields(b));
+    const avatarByOwner = await ownerAvatarsByClerkId(stripped.map((b) => b.ownerClerkUserId));
+    const enriched = stripped.map((b) => ({
+      ...b,
+      ownerAvatarUrl: avatarByOwner[b.ownerClerkUserId] || '',
+    }));
+    return res.json({ books: enriched });
   } catch (err) {
     return next(err);
   }
@@ -95,7 +123,9 @@ export async function getBookById(req, res, next) {
     if (!book) {
       return res.status(404).json({ error: 'Book not found' });
     }
-    return res.json({ book: stripPublicBookFields(book) });
+    const base = stripPublicBookFields(book);
+    const ownerAvatarUrl = await ownerAvatarUrlFor(base.ownerClerkUserId);
+    return res.json({ book: { ...base, ownerAvatarUrl } });
   } catch (err) {
     return next(err);
   }
