@@ -1,0 +1,23 @@
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { ChatsInboxScreen } from '../screens/ChatsInboxScreen';
+import { RequestsScreen } from '../screens/RequestsScreen';
+import { RequestChatScreen } from '../screens/RequestChatScreen';
+import { WriteReviewScreen } from '../screens/WriteReviewScreen';
+import type { RequestsStackParamList } from './requestsStackTypes';
+
+const Stack = createNativeStackNavigator<RequestsStackParamList>();
+
+export function RequestsStack() {
+  return (
+    <Stack.Navigator
+      id="RequestsStackRoot"
+      initialRouteName="ChatsInbox"
+      screenOptions={{ headerShown: false }}
+    >
+      <Stack.Screen name="ChatsInbox" component={ChatsInboxScreen} />
+      <Stack.Screen name="RequestsHome" component={RequestsScreen} />
+      <Stack.Screen name="RequestChat" component={RequestChatScreen} />
+      <Stack.Screen name="WriteReview" component={WriteReviewScreen} />
+    </Stack.Navigator>
+  );
+}

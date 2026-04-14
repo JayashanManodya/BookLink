@@ -1,0 +1,23 @@
+/** Allowed book categories for listings (keep in sync with Frontend `src/constants/bookTypes.ts`). */
+export const BOOK_TYPES = [
+  'Fiction',
+  'Non-Fiction',
+  'Mystery',
+  'Thriller',
+  'Romance',
+  'Fantasy',
+  'Science Fiction',
+  'Horror',
+  'Historical Fiction',
+  'Biography',
+  'Autobiography',
+  'Self-Help',
+  'Educational',
+  'Reference',
+  "Children's",
+  'Poetry',
+  'Drama',
+  'Comics',
+  'Travel',
+  'Religious',
+];
