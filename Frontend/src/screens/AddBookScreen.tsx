@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -208,10 +209,32 @@ export function AddBookScreen({ navigation }: Props) {
         </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 }]} keyboardShouldPersistTaps="handled">
-          <Pressable style={[styles.upload, cardShadow]} onPress={() => void pickCover()}>
-            <Ionicons name="image-outline" size={36} color={warmHaze} />
-            <Text style={styles.uploadHint}>{coverUri ? 'Change cover photo' : 'Tap to add cover photo'}</Text>
-          </Pressable>
+          {coverUri ? (
+            <View style={[styles.previewWrap, cardShadow]}>
+              <Image source={{ uri: coverUri }} style={styles.previewImg} resizeMode="cover" />
+              <View style={styles.previewActions}>
+                <Pressable style={styles.previewBtn} onPress={() => void pickCover()}>
+                  <Ionicons name="swap-horizontal" size={16} color={lead} />
+                  <Text style={styles.previewBtnTxt}>Change</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.previewBtn, styles.previewBtnDanger]}
+                  onPress={() => {
+                    setCoverUri(null);
+                    setCoverMime(null);
+                  }}
+                >
+                  <Ionicons name="trash-outline" size={16} color={lead} />
+                  <Text style={styles.previewBtnTxt}>Remove</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            <Pressable style={[styles.upload, cardShadow]} onPress={() => void pickCover()}>
+              <Ionicons name="image-outline" size={36} color={warmHaze} />
+              <Text style={styles.uploadHint}>Tap to add cover photo</Text>
+            </Pressable>
+          )}
           <Field label="Book title" value={title} onChangeText={setTitle} />
           <Field label="Author" value={author} onChangeText={setAuthor} />
           <Field
@@ -408,6 +431,33 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f8fa',
   },
   uploadHint: { fontSize: 14, color: textSecondary, fontWeight: '600' },
+  previewWrap: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#f8f8fa',
+    borderWidth: 1,
+    borderColor: dreamland,
+  },
+  previewImg: { width: '100%', aspectRatio: 3 / 4, backgroundColor: '#eceef2' },
+  previewActions: {
+    flexDirection: 'row',
+    gap: 8,
+    padding: 10,
+    justifyContent: 'center',
+  },
+  previewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+    backgroundColor: cascadingWhite,
+  },
+  previewBtnDanger: { backgroundColor: '#fdecec', borderColor: '#f5c2c7' },
+  previewBtnTxt: { fontSize: 13, fontWeight: '700', color: lead },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
   hint: { fontSize: 13, color: textSecondary, lineHeight: 18, marginTop: -6 },
   input: {
