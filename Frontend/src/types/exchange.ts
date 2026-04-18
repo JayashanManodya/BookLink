@@ -17,6 +17,8 @@ export type ExchangeRequest = {
   meetupScheduledAt?: string | null;
   meetupContactNumber?: string;
   status: 'pending' | 'accepted' | 'rejected' | 'cancelled';
+  /** ISO timestamp when the requester confirmed receipt of the book. */
+  requesterConfirmedAt?: string | null;
   /** True when a review exists for this exchange (one per swap). */
   hasExchangeReview?: boolean;
   createdAt?: string;

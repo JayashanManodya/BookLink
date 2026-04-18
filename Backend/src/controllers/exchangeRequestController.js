@@ -70,6 +70,7 @@ function serializeRequest(doc, bookLean, profileById = {}, extra = {}) {
     meetupScheduledAt: o.meetupScheduledAt ? new Date(o.meetupScheduledAt).toISOString() : null,
     meetupContactNumber: o.meetupContactNumber || '',
     status: o.status,
+    requesterConfirmedAt: o.requesterConfirmedAt ? new Date(o.requesterConfirmedAt).toISOString() : null,
     hasExchangeReview: Boolean(extra.hasExchangeReview),
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,
@@ -407,6 +408,39 @@ export async function createExchangeMessage(req, res, next) {
     });
     const userProfiles = await getPublicProfilesById([req.clerkUserId]);
     return res.status(201).json({ message: serializeMessage(msg, userProfiles) });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function confirmExchangeRequestReceipt(req, res, next) {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+    const row = await ExchangeRequest.findById(id);
+    if (!row) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+    if (row.requesterClerkUserId !== req.clerkUserId) {
+      return res.status(403).json({ error: 'Only the requester can confirm receipt' });
+    }
+    if (row.status !== 'accepted') {
+      return res.status(400).json({ error: 'Receipt can only be confirmed after the request is accepted' });
+    }
+    if (row.requesterConfirmedAt) {
+      return res.status(400).json({ error: 'You already confirmed this exchange' });
+    }
+    row.requesterConfirmedAt = new Date();
+    await row.save();
+
+    const book = await Book.findById(row.bookId).lean();
+    const userProfiles = await getPublicProfilesById([row.requesterClerkUserId, row.ownerClerkUserId]);
+    const hasExchangeReview = Boolean(await Review.exists({ exchangeRequestId: row._id }));
+    return res.json({
+      request: serializeRequest(row.toObject(), book, userProfiles, { hasExchangeReview }),
+    });
   } catch (err) {
     return next(err);
   }

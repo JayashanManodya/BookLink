@@ -15,7 +15,7 @@ import { useAuth } from '@clerk/clerk-expo';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { api } from '../lib/api';
+import { api, apiErrorMessage } from '../lib/api';
 import { SignInGateCard } from '../components/SignInGateCard';
 import { SignInWithGoogleButton } from '../components/SignInWithGoogleButton';
 import type { BrowseStackParamList } from '../navigation/browseStackTypes';
@@ -92,7 +92,7 @@ export function RequestExchangeScreen({ navigation, route }: Props) {
         { text: 'OK', onPress: () => navigation.popToTop() },
       ]);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Could not send request';
+      const msg = apiErrorMessage(e, 'Could not send request');
       Alert.alert('Error', msg);
     } finally {
       setBusy(false);

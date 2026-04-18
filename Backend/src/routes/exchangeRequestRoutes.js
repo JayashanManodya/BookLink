@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+  confirmExchangeRequestReceipt,
   createExchangeMessage,
   createExchangeRequest,
   deleteExchangeRequest,
@@ -18,6 +19,7 @@ router.get('/:id/messages', requireClerkAuth, listExchangeMessages);
 router.get('/:id', requireClerkAuth, getExchangeRequestById);
 router.post('/', requireClerkAuth, createExchangeRequest);
 router.patch('/:id/meetup', requireClerkAuth, setExchangeRequestMeetup);
+router.post('/:id/confirm-receipt', requireClerkAuth, confirmExchangeRequestReceipt);
 router.patch('/:id', requireClerkAuth, updateExchangeRequestStatus);
 router.delete('/:id', requireClerkAuth, deleteExchangeRequest);
 router.post('/:id/messages', requireClerkAuth, createExchangeMessage);

@@ -73,6 +73,26 @@ export function RequestsScreen({ navigation }: Props) {
     }
   };
 
+  const confirmReceipt = async (id: string) => {
+    try {
+      await api.post(`/api/requests/${id}/confirm-receipt`);
+      void load();
+    } catch (e: unknown) {
+      Alert.alert('Error', apiErrorMessage(e, 'Could not confirm receipt'));
+    }
+  };
+
+  const confirmBookReceived = (id: string) => {
+    confirmDestructive({
+      title: 'Confirm you received the book',
+      message: 'Mark this exchange as successfully received. After confirming, you won\u2019t be able to report this exchange.',
+      cancelLabel: 'Not yet',
+      confirmLabel: 'Yes, I got it',
+      confirmStyle: 'default',
+      onConfirm: () => void confirmReceipt(id),
+    });
+  };
+
   const deleteRequest = async (id: string) => {
     try {
       await api.delete(`/api/requests/${id}`);
@@ -209,35 +229,51 @@ export function RequestsScreen({ navigation }: Props) {
                 ) : null}
                 {tab === 'sent' && r.status === 'accepted' ? (
                   <View style={styles.reviewReportBlock}>
-                    <View style={styles.reviewReportRow}>
-                      {!r.hasExchangeReview ? (
-                        <Pressable
-                          style={[styles.reviewBtn, styles.reviewReportHalf]}
-                          onPress={() =>
-                            navigation.navigate('WriteReview', {
-                              exchangeRequestId: r._id,
-                              revieweeClerkUserId: r.ownerClerkUserId,
-                              revieweeName: r.ownerDisplayName || 'Lister',
-                            })
-                          }
-                        >
-                          <Text style={styles.reviewTxt}>Leave a review</Text>
-                        </Pressable>
-                      ) : null}
-                      <Pressable
-                        style={[
-                          styles.reportBtn,
-                          r.hasExchangeReview ? styles.reportBtnFull : styles.reviewReportHalf,
-                        ]}
-                        onPress={() => openReportForExchange(r, 'sent')}
-                      >
-                        <Ionicons name="flag-outline" size={17} color={lead} />
-                        <Text style={styles.reportTxt}>Report</Text>
-                      </Pressable>
-                    </View>
-                    {r.hasExchangeReview ? (
-                      <Text style={styles.reviewDone}>You reviewed this exchange</Text>
-                    ) : null}
+                    {!r.requesterConfirmedAt ? (
+                      <>
+                        <Text style={styles.confirmHint}>
+                          Did you receive the book in good condition? Confirm below, or report an issue before confirming.
+                        </Text>
+                        <View style={styles.reviewReportRow}>
+                          <Pressable
+                            style={[styles.confirmBtn, styles.reviewReportHalf]}
+                            onPress={() => confirmBookReceived(r._id)}
+                          >
+                            <Ionicons name="checkmark-circle-outline" size={17} color="#27500a" />
+                            <Text style={styles.confirmTxt}>Confirm receipt</Text>
+                          </Pressable>
+                          <Pressable
+                            style={[styles.reportBtn, styles.reviewReportHalf]}
+                            onPress={() => openReportForExchange(r, 'sent')}
+                          >
+                            <Ionicons name="flag-outline" size={17} color={lead} />
+                            <Text style={styles.reportTxt}>Report</Text>
+                          </Pressable>
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={styles.confirmedDone}>
+                          <Ionicons name="checkmark-circle" size={14} color="#27500a" /> You confirmed receipt of this book
+                        </Text>
+                        {!r.hasExchangeReview ? (
+                          <Pressable
+                            style={styles.reviewBtn}
+                            onPress={() =>
+                              navigation.navigate('WriteReview', {
+                                exchangeRequestId: r._id,
+                                revieweeClerkUserId: r.ownerClerkUserId,
+                                revieweeName: r.ownerDisplayName || 'Lister',
+                              })
+                            }
+                          >
+                            <Text style={styles.reviewTxt}>Leave a review</Text>
+                          </Pressable>
+                        ) : (
+                          <Text style={styles.reviewDone}>You reviewed this exchange</Text>
+                        )}
+                      </>
+                    )}
                   </View>
                 ) : null}
                 {tab === 'received' && r.status === 'accepted' ? (
@@ -467,5 +503,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: textSecondary,
+  },
+  confirmHint: { fontSize: 13, color: textSecondary, lineHeight: 18 },
+  confirmBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 14,
+    paddingVertical: 12,
+    backgroundColor: '#eaf3de',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#c0dd97',
+  },
+  confirmTxt: { fontSize: 14, fontWeight: '800', color: '#27500a' },
+  confirmedDone: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#27500a',
   },
 });

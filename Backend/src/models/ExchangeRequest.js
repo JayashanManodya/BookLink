@@ -23,6 +23,7 @@ const exchangeRequestSchema = new mongoose.Schema(
       default: 'pending',
       index: true,
     },
+    requesterConfirmedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
