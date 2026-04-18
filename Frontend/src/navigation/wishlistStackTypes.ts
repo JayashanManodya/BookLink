@@ -1,7 +1,7 @@
 export type WishlistStackParamList = {
   WishlistBoard: { initialTab?: 'community' | 'mine' } | undefined;
   WishlistChats: undefined;
-  PostWanted: undefined;
+  PostWanted: { editItemId?: string } | undefined;
   WishlistMatches: undefined;
   WantedBookDetail: { wishlistItemId: string };
   WishlistThreadChat: {

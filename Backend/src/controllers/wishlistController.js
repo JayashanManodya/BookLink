@@ -185,7 +185,36 @@ export async function updateWishlistItem(req, res, next) {
     if (item.ownerClerkUserId !== req.clerkUserId) {
       return res.status(403).json({ error: 'Forbidden' });
     }
-    const { urgency, status, wantedBookPhoto, description } = req.body ?? {};
+    const {
+      title,
+      author,
+      subject,
+      grade,
+      language,
+      urgency,
+      status,
+      wantedBookPhoto,
+      description,
+    } = req.body ?? {};
+    if (typeof title === 'string') {
+      const t = title.trim();
+      if (!t) {
+        return res.status(400).json({ error: 'title cannot be empty' });
+      }
+      item.title = t;
+    }
+    if (typeof author === 'string') {
+      item.author = author.trim();
+    }
+    if (typeof subject === 'string') {
+      item.subject = subject.trim();
+    }
+    if (typeof grade === 'string') {
+      item.grade = grade.trim();
+    }
+    if (typeof language === 'string') {
+      item.language = language.trim();
+    }
     if (['high', 'medium', 'low'].includes(urgency)) {
       item.urgency = urgency;
     }

@@ -177,9 +177,18 @@ export function WantedBookDetailScreen({ navigation, route }: Props) {
               When someone has this book, they can message you here. Open a chat below to reply.
             </Text>
             {item.status === 'open' ? (
-              <Pressable style={[styles.secondaryBtn, cardShadow]} onPress={() => markFulfilled()}>
-                <Text style={styles.secondaryBtnTxt}>Mark as fulfilled</Text>
-              </Pressable>
+              <View style={styles.ownerActionsRow}>
+                <Pressable
+                  style={[styles.secondaryBtn, cardShadow]}
+                  onPress={() => navigation.navigate('PostWanted', { editItemId: item._id })}
+                >
+                  <Ionicons name="create-outline" size={16} color={lead} />
+                  <Text style={styles.secondaryBtnTxt}>Edit</Text>
+                </Pressable>
+                <Pressable style={[styles.secondaryBtn, cardShadow]} onPress={() => markFulfilled()}>
+                  <Text style={styles.secondaryBtnTxt}>Mark as fulfilled</Text>
+                </Pressable>
+              </View>
             ) : (
               <Text style={styles.closed}>This post is fulfilled.</Text>
             )}
@@ -265,8 +274,11 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: 17, fontWeight: '800', color: lead },
   cardBody: { fontSize: 14, color: textSecondary, lineHeight: 20 },
+  ownerActionsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   secondaryBtn: {
-    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     backgroundColor: '#f3f3f5',
     paddingHorizontal: 16,
     paddingVertical: 12,

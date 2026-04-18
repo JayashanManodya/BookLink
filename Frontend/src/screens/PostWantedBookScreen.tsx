@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -14,9 +14,10 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { api } from '../lib/api';
+import { api, apiErrorMessage } from '../lib/api';
 import { alertOk } from '../lib/platformAlert';
 import type { WishlistStackParamList } from '../navigation/wishlistStackTypes';
+import type { WishlistItem } from '../types/wishlist';
 import {
   cascadingWhite,
   crunch,
@@ -31,8 +32,10 @@ type Props = NativeStackScreenProps<WishlistStackParamList, 'PostWanted'>;
 
 const URGENCY = ['high', 'medium', 'low'] as const;
 
-export function PostWantedBookScreen({ navigation }: Props) {
+export function PostWantedBookScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const editItemId = route.params?.editItemId;
+  const isEdit = Boolean(editItemId);
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [description, setDescription] = useState('');
@@ -41,7 +44,40 @@ export function PostWantedBookScreen({ navigation }: Props) {
   const [urgency, setUrgency] = useState<(typeof URGENCY)[number]>('medium');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoMime, setPhotoMime] = useState<string | null>(null);
+  const [existingPhotoUrl, setExistingPhotoUrl] = useState('');
   const [busy, setBusy] = useState(false);
+  const [loadingEdit, setLoadingEdit] = useState(isEdit);
+
+  useEffect(() => {
+    if (!editItemId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get<{ item: WishlistItem }>(`/api/wishlist/${editItemId}`);
+        if (cancelled) return;
+        const it = res.data.item;
+        setTitle(it.title ?? '');
+        setAuthor(it.author ?? '');
+        setDescription(it.description ?? '');
+        setSubject(it.subject ?? '');
+        setLanguage(it.language ?? '');
+        setUrgency(
+          (['high', 'medium', 'low'] as const).includes(it.urgency as 'high' | 'medium' | 'low')
+            ? (it.urgency as (typeof URGENCY)[number])
+            : 'medium'
+        );
+        setExistingPhotoUrl(it.wantedBookPhoto ?? '');
+      } catch (e: unknown) {
+        if (cancelled) return;
+        alertOk('Error', apiErrorMessage(e, 'Could not load wanted book'));
+      } finally {
+        if (!cancelled) setLoadingEdit(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [editItemId]);
 
   const pickPhoto = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -62,7 +98,7 @@ export function PostWantedBookScreen({ navigation }: Props) {
   };
 
   const uploadPhotoIfNeeded = async (): Promise<string> => {
-    if (!photoUri) return '';
+    if (!photoUri) return existingPhotoUrl;
     const form = new FormData();
     const name = photoMime?.includes('png') ? 'wanted.png' : 'wanted.jpg';
     const type = photoMime ?? 'image/jpeg';
@@ -88,7 +124,7 @@ export function PostWantedBookScreen({ navigation }: Props) {
     setBusy(true);
     try {
       const wantedBookPhoto = await uploadPhotoIfNeeded();
-      await api.post('/api/wishlist', {
+      const payload = {
         title: title.trim(),
         author: author.trim(),
         description: desc,
@@ -97,25 +133,48 @@ export function PostWantedBookScreen({ navigation }: Props) {
         language: language.trim(),
         urgency,
         wantedBookPhoto,
-      });
-      alertOk('Success', 'Your wanted book is on the community board.', () => {
-        setTitle('');
-        setAuthor('');
-        setDescription('');
-        setSubject('');
-        setLanguage('');
-        setUrgency('medium');
-        setPhotoUri(null);
-        setPhotoMime(null);
-        navigation.goBack();
-      });
+      };
+      if (isEdit && editItemId) {
+        await api.put(`/api/wishlist/${editItemId}`, payload);
+        alertOk('Saved', 'Your wanted book has been updated.', () => navigation.goBack());
+      } else {
+        await api.post('/api/wishlist', payload);
+        alertOk('Success', 'Your wanted book is on the community board.', () => {
+          setTitle('');
+          setAuthor('');
+          setDescription('');
+          setSubject('');
+          setLanguage('');
+          setUrgency('medium');
+          setPhotoUri(null);
+          setPhotoMime(null);
+          navigation.goBack();
+        });
+      }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Could not post';
-      alertOk('Error', msg);
+      alertOk('Error', apiErrorMessage(e, isEdit ? 'Could not save' : 'Could not post'));
     } finally {
       setBusy(false);
     }
   };
+
+  const previewUri = photoUri || existingPhotoUrl;
+
+  if (loadingEdit) {
+    return (
+      <View style={[styles.flex, { paddingTop: Math.max(insets.top, 8) }]}>
+        <View style={styles.topBar}>
+          <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={24} color={lead} />
+            <Text style={styles.backText}>Back</Text>
+          </Pressable>
+          <Text style={styles.screenTitle}>Edit wanted</Text>
+          <View style={{ width: 72 }} />
+        </View>
+        <ActivityIndicator style={{ marginTop: 40 }} color={crunch} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.flex}>
@@ -124,18 +183,22 @@ export function PostWantedBookScreen({ navigation }: Props) {
           <Ionicons name="chevron-back" size={24} color={lead} />
           <Text style={styles.backText}>Back</Text>
         </Pressable>
-        <Text style={styles.screenTitle}>Post wanted</Text>
+        <Text style={styles.screenTitle}>{isEdit ? 'Edit wanted' : 'Post wanted'}</Text>
         <View style={{ width: 72 }} />
       </View>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={styles.hint}>Tell the community what you need. Other readers may offer a swap.</Text>
+        <Text style={styles.hint}>
+          {isEdit
+            ? 'Update the details of your wanted book.'
+            : 'Tell the community what you need. Other readers may offer a swap.'}
+        </Text>
         <Pressable style={[styles.upload, cardShadow]} onPress={() => void pickPhoto()}>
-          {photoUri ? (
-            <Image source={{ uri: photoUri }} style={styles.preview} resizeMode="cover" />
+          {previewUri ? (
+            <Image source={{ uri: previewUri }} style={styles.preview} resizeMode="cover" />
           ) : (
             <Ionicons name="image-outline" size={34} color={warmHaze} />
           )}
-          <Text style={styles.uploadHint}>{photoUri ? 'Change wanted photo' : 'Add wanted book photo'}</Text>
+          <Text style={styles.uploadHint}>{previewUri ? 'Change wanted photo' : 'Add wanted book photo'}</Text>
         </Pressable>
         <Field label="Title" value={title} onChangeText={setTitle} placeholder="ICT Revision Guide 2024" />
         <Field label="Author (optional)" value={author} onChangeText={setAuthor} />
@@ -163,7 +226,11 @@ export function PostWantedBookScreen({ navigation }: Props) {
           ))}
         </View>
         <Pressable style={[styles.submit, cardShadow]} onPress={() => void submit()} disabled={busy}>
-          {busy ? <ActivityIndicator color={lead} /> : <Text style={styles.submitTxt}>Publish wanted book</Text>}
+          {busy ? (
+            <ActivityIndicator color={lead} />
+          ) : (
+            <Text style={styles.submitTxt}>{isEdit ? 'Save changes' : 'Publish wanted book'}</Text>
+          )}
         </Pressable>
       </ScrollView>
     </View>
