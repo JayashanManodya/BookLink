@@ -148,7 +148,7 @@ export function BrowseListScreen({ navigation }: Props) {
       >
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.greetTitle} numberOfLines={1}>Hi, {greetingName} 👋</Text>
+            <Text style={styles.greetTitle} numberOfLines={1}>Hi, {greetingName}</Text>
             <Text style={styles.greetSub}>Explore the world of books</Text>
           </View>
           <Pressable style={styles.avatarCircle} onPress={() => navigation.navigate('AddBook')} hitSlop={8}>
