@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   BackHandler,
   Image,
   KeyboardAvoidingView,
@@ -23,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChatImageLightbox } from '../components/ChatImageLightbox';
 import { ChatMessageRow } from '../components/ChatMessageRow';
 import { api, apiErrorMessage } from '../lib/api';
+import { alertOk } from '../lib/platformAlert';
 import { pickChatImageFromLibrary } from '../lib/pickChatImage';
 import { uploadChatImage } from '../lib/uploadChatImage';
 import { hasMapCoords, openGoogleMapsDirections, openGoogleMapsSearch } from '../lib/mapsLinks';
@@ -231,15 +231,18 @@ export function RequestChatScreen({ navigation, route }: Props) {
   };
 
   const confirmMeetup = async () => {
-    if (!selectedPoint) return;
+    if (!selectedPoint) {
+      alertOk('Meet-up', 'Pick a collection point first.');
+      return;
+    }
     const meetupAt = combineLocalDateTimeToISO(meetupDateStr, meetupTimeStr);
     if (!meetupAt) {
-      Alert.alert('Date & time', 'Use date as YYYY-MM-DD and time as HH:mm (24-hour), e.g. 14:30.');
+      alertOk('Date & time', 'Use date as YYYY-MM-DD and time as HH:mm (24-hour), e.g. 14:30.');
       return;
     }
     const contact = meetupContactStr.trim();
     if (contact.length < 5) {
-      Alert.alert('Contact', 'Enter a contact number (at least 5 characters).');
+      alertOk('Contact', 'Enter a contact number (at least 5 characters).');
       return;
     }
     setMeetupBusy(true);

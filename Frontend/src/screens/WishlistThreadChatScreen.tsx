@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   BackHandler,
   Image,
   KeyboardAvoidingView,
@@ -15,6 +14,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { alertOk } from '../lib/platformAlert';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { CommonActions } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -123,6 +123,7 @@ export function WishlistThreadChatScreen({ navigation, route }: Props) {
   const [meetupDateStr, setMeetupDateStr] = useState('');
   const [meetupTimeStr, setMeetupTimeStr] = useState('');
   const [meetupContactStr, setMeetupContactStr] = useState('');
+  const [meetupError, setMeetupError] = useState<string | null>(null);
   const [lightboxUri, setLightboxUri] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -207,6 +208,7 @@ export function WishlistThreadChatScreen({ navigation, route }: Props) {
     setMeetupModal(false);
     setMeetupStep('pick');
     setSelectedPoint(null);
+    setMeetupError(null);
   };
 
   const openMeetupModal = () => {
@@ -216,6 +218,8 @@ export function WishlistThreadChatScreen({ navigation, route }: Props) {
     setMeetupDateStr(defaultMeetupDateStr());
     setMeetupTimeStr(defaultMeetupTimeStr());
     setMeetupContactStr('');
+    setMeetupError(null);
+    setMeetupBusy(false);
     setMeetupModal(true);
   };
 
@@ -224,21 +228,32 @@ export function WishlistThreadChatScreen({ navigation, route }: Props) {
     setMeetupDateStr(defaultMeetupDateStr());
     setMeetupTimeStr(defaultMeetupTimeStr());
     setMeetupContactStr(p.contactNumber?.trim() || '');
+    setMeetupError(null);
     setMeetupStep('details');
   };
 
   const confirmMeetup = async () => {
-    if (!selectedPoint) return;
+    if (!selectedPoint) {
+      const msg = 'Pick a collection point first.';
+      setMeetupError(msg);
+      alertOk('Meet-up', msg);
+      return;
+    }
     const meetupAt = combineLocalDateTimeToISO(meetupDateStr, meetupTimeStr);
     if (!meetupAt) {
-      Alert.alert('Date & time', 'Use date as YYYY-MM-DD and time as HH:mm (24-hour), e.g. 14:30.');
+      const msg = 'Use date as YYYY-MM-DD and time as HH:mm (24-hour), e.g. 14:30.';
+      setMeetupError(msg);
+      alertOk('Date & time', msg);
       return;
     }
     const contact = meetupContactStr.trim();
     if (contact.length < 5) {
-      Alert.alert('Contact', 'Enter a contact number (at least 5 characters).');
+      const msg = 'Enter a contact number (at least 5 characters).';
+      setMeetupError(msg);
+      alertOk('Contact', msg);
       return;
     }
+    setMeetupError(null);
     setMeetupBusy(true);
     try {
       await api.patch(`/api/wishlist/threads/${threadId}/meetup`, {
@@ -249,7 +264,9 @@ export function WishlistThreadChatScreen({ navigation, route }: Props) {
       closeMeetupModal();
       await load();
     } catch (e: unknown) {
-      setError(apiErrorMessage(e, 'Could not set meet-up'));
+      const msg = apiErrorMessage(e, 'Could not set meet-up');
+      setMeetupError(msg);
+      setError(msg);
     } finally {
       setMeetupBusy(false);
     }
@@ -511,6 +528,7 @@ export function WishlistThreadChatScreen({ navigation, route }: Props) {
                   </View>
                   <Text style={styles.modalHint}>Times use your device’s local timezone.</Text>
                 </ScrollView>
+                {meetupError ? <Text style={styles.modalError}>{meetupError}</Text> : null}
                 <View style={styles.modalActionsRow}>
                   <Pressable
                     style={styles.modalBackBtn}
@@ -759,6 +777,13 @@ const styles = StyleSheet.create({
     color: lead,
   },
   modalHint: { fontSize: 13, color: textSecondary, marginBottom: 8, lineHeight: 18 },
+  modalError: {
+    color: '#b3261e',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 6,
+    marginBottom: 4,
+  },
   modalActionsRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
   modalBackBtn: {
     flex: 1,
