@@ -263,7 +263,9 @@ export function AddBookScreen({ navigation }: Props) {
                 ))}
               </View>
             </View>
-            <Field label="Language" value={language} onChangeText={setLanguage} placeholder="Sinhala / Tamil / English" />
+            <View style={styles.rowFieldGrow}>
+              <Field label="Language" value={language} onChangeText={setLanguage} placeholder="Sinhala / Tamil / English" />
+            </View>
           </View>
 
           <Text style={styles.hint}>
@@ -373,7 +375,7 @@ function Field({
   numberOfLines?: number;
 }) {
   return (
-    <View style={{ flex: 1, gap: 6 }}>
+    <View style={styles.fieldWrap}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
         value={value}
@@ -404,7 +406,9 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 20, gap: 12, paddingTop: 8 },
   gateScroll: { flexGrow: 1, paddingBottom: 32 },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
-  hint: { fontSize: 13, color: textSecondary, lineHeight: 18, marginTop: -6 },
+  hint: { fontSize: 13, color: textSecondary, lineHeight: 18, marginTop: 4 },
+  fieldWrap: { width: '100%', gap: 6 },
+  rowFieldGrow: { flex: 1, minWidth: 0 },
   input: {
     backgroundColor: '#f3f3f5',
     borderRadius: 14,

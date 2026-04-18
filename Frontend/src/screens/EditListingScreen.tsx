@@ -257,7 +257,9 @@ export function EditListingScreen({ navigation, route }: Props) {
               ))}
             </View>
           </View>
-          <Field label="Language" value={language} onChangeText={setLanguage} placeholder="English / Sinhala / Tamil" />
+          <View style={styles.rowFieldGrow}>
+            <Field label="Language" value={language} onChangeText={setLanguage} placeholder="English / Sinhala / Tamil" />
+          </View>
         </View>
 
         <Pressable style={[styles.submit, cardShadow]} onPress={() => void submit()} disabled={busy}>
@@ -362,7 +364,7 @@ function Field({
   numberOfLines?: number;
 }) {
   return (
-    <View style={{ flex: 1, gap: 6 }}>
+    <View style={styles.fieldWrap}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
         value={value}
@@ -392,6 +394,8 @@ const styles = StyleSheet.create({
   backText: { fontSize: 15, fontWeight: '600', color: lead },
   screenTitle: { fontSize: 18, fontWeight: '800', color: lead },
   scroll: { paddingHorizontal: 20, gap: 12, paddingBottom: 32, paddingTop: 8 },
+  fieldWrap: { width: '100%', gap: 6 },
+  rowFieldGrow: { flex: 1, minWidth: 0 },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
   input: {
     backgroundColor: '#f3f3f5',

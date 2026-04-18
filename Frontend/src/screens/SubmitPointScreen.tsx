@@ -245,7 +245,7 @@ function Field({
   multiline?: boolean;
 }) {
   return (
-    <View style={{ gap: 6 }}>
+    <View style={styles.fieldWrap}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
         value={value}
@@ -269,6 +269,7 @@ const styles = StyleSheet.create({
   mapSectionTitle: { fontSize: 17, fontWeight: '800', color: lead, marginTop: 4 },
   mapSectionSub: { fontSize: 14, color: textSecondary, lineHeight: 20 },
   detailsTitle: { fontSize: 15, fontWeight: '800', color: lead, marginTop: 8 },
+  fieldWrap: { width: '100%', gap: 6 },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
   input: {
     backgroundColor: '#f3f3f5',

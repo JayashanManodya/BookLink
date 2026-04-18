@@ -244,7 +244,7 @@ function Field({
   numberOfLines?: number;
 }) {
   return (
-    <View style={{ flex: 1, gap: 6 }}>
+    <View style={styles.fieldWrap}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
         value={value}
@@ -274,6 +274,7 @@ const styles = StyleSheet.create({
   screenTitle: { fontSize: 17, fontWeight: '800', color: lead },
   scroll: { paddingHorizontal: 20, gap: 12, paddingBottom: 40, paddingTop: 8 },
   hint: { fontSize: 14, color: textSecondary, lineHeight: 20 },
+  fieldWrap: { width: '100%', gap: 6 },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
   input: {
     backgroundColor: '#f3f3f5',
@@ -286,7 +287,6 @@ const styles = StyleSheet.create({
     color: lead,
   },
   inputMultiline: { minHeight: 92, paddingTop: 12 },
-  row2: { flexDirection: 'row', gap: 10 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     paddingHorizontal: 14,
