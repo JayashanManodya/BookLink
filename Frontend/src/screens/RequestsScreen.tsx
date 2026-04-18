@@ -304,35 +304,14 @@ export function RequestsScreen({ navigation }: Props) {
                     {!r.requesterConfirmedAt ? (
                       <>
                         <Text style={styles.confirmHint}>
-                          Did you receive the book in good condition? Confirm when you have the book.
+                          Confirm when you have the book, or report a problem first. After you confirm, you can only leave a
+                          review (no more reporting).
                         </Text>
-                        <Pressable style={styles.confirmBtnFull} onPress={() => confirmBookReceived(r._id)}>
-                          <Ionicons name="checkmark-circle-outline" size={17} color="#27500a" />
-                          <Text style={styles.confirmTxt}>Confirm receipt</Text>
-                        </Pressable>
-                      </>
-                    ) : (
-                      <>
-                        <Text style={styles.confirmedDone}>
-                          <Ionicons name="checkmark-circle" size={14} color="#27500a" /> You confirmed receipt of this book
-                        </Text>
-                        <View style={styles.postConfirmRow}>
-                          {!r.hasExchangeReview ? (
-                            <Pressable
-                              style={styles.reviewBtnHalf}
-                              onPress={() =>
-                                navigation.navigate('WriteReview', {
-                                  exchangeRequestId: r._id,
-                                  revieweeClerkUserId: r.ownerClerkUserId,
-                                  revieweeName: r.ownerDisplayName || 'Lister',
-                                })
-                              }
-                            >
-                              <Text style={styles.reviewTxt}>Leave a review</Text>
-                            </Pressable>
-                          ) : (
-                            <Text style={[styles.reviewDone, styles.postConfirmHalf]}>You reviewed this exchange</Text>
-                          )}
+                        <View style={styles.preConfirmRow}>
+                          <Pressable style={styles.confirmBtnHalf} onPress={() => confirmBookReceived(r._id)}>
+                            <Ionicons name="checkmark-circle-outline" size={17} color="#27500a" />
+                            <Text style={styles.confirmTxt}>Confirm receipt</Text>
+                          </Pressable>
                           {!r.myExchangeReportId ? (
                             <Pressable
                               style={styles.reportBtnHalf}
@@ -362,37 +341,28 @@ export function RequestsScreen({ navigation }: Props) {
                           )}
                         </View>
                       </>
-                    )}
-                  </View>
-                ) : null}
-                {tab === 'received' && r.status === 'accepted' ? (
-                  <View style={styles.ownerReportBlock}>
-                    {!r.myExchangeReportId ? (
-                      <Pressable
-                        style={styles.reportBtnFull}
-                        onPress={() =>
-                          navigation.navigate('ReportExchange', {
-                            exchangeRequestId: r._id,
-                            bookTitle: r.bookTitle || 'Book',
-                          })
-                        }
-                      >
-                        <Ionicons name="flag-outline" size={17} color="#8b2500" />
-                        <Text style={styles.reportTxt}>Report an issue with this swap</Text>
-                      </Pressable>
                     ) : (
-                      <Pressable
-                        style={styles.reportEditFull}
-                        onPress={() =>
-                          navigation.navigate('ReportExchange', {
-                            exchangeRequestId: r._id,
-                            bookTitle: r.bookTitle || 'Book',
-                            reportId: r.myExchangeReportId,
-                          })
-                        }
-                      >
-                        <Text style={styles.reportEditTxt}>View or edit your report</Text>
-                      </Pressable>
+                      <>
+                        <Text style={styles.confirmedDone}>
+                          <Ionicons name="checkmark-circle" size={14} color="#27500a" /> You confirmed receipt of this book
+                        </Text>
+                        {!r.hasExchangeReview ? (
+                          <Pressable
+                            style={styles.reviewBtn}
+                            onPress={() =>
+                              navigation.navigate('WriteReview', {
+                                exchangeRequestId: r._id,
+                                revieweeClerkUserId: r.ownerClerkUserId,
+                                revieweeName: r.ownerDisplayName || 'Lister',
+                              })
+                            }
+                          >
+                            <Text style={styles.reviewTxt}>Leave a review</Text>
+                          </Pressable>
+                        ) : (
+                          <Text style={styles.reviewDone}>You reviewed this exchange</Text>
+                        )}
+                      </>
                     )}
                   </View>
                 ) : null}
@@ -628,11 +598,8 @@ const styles = StyleSheet.create({
   chatTxt: { fontSize: 14, fontWeight: '700', color: lead },
   offered: { width: '100%', height: 140, borderRadius: 12, marginTop: 4, backgroundColor: chineseSilver },
   receiptPromptBlock: { marginTop: 4, gap: 6 },
-  postConfirmRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4, alignItems: 'stretch' },
-  postConfirmHalf: { flex: 1, minWidth: '42%', justifyContent: 'center' },
-  reviewBtnHalf: {
-    flex: 1,
-    minWidth: '42%',
+  preConfirmRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4, alignItems: 'stretch' },
+  reviewBtn: {
     borderRadius: 14,
     paddingVertical: 12,
     alignItems: 'center',
@@ -640,6 +607,20 @@ const styles = StyleSheet.create({
     backgroundColor: crunch,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
+    alignSelf: 'stretch',
+  },
+  confirmBtnHalf: {
+    flex: 1,
+    minWidth: '42%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 14,
+    paddingVertical: 12,
+    backgroundColor: '#eaf3de',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#c0dd97',
   },
   reportBtnHalf: {
     flex: 1,
@@ -667,29 +648,6 @@ const styles = StyleSheet.create({
   },
   reportEditTxt: { fontSize: 14, fontWeight: '800', color: lead },
   reportTxt: { fontSize: 14, fontWeight: '800', color: '#8b2500' },
-  ownerReportBlock: { marginTop: 4, gap: 6 },
-  reportBtnFull: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderRadius: 14,
-    paddingVertical: 12,
-    backgroundColor: '#fff5f0',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#e8c4b8',
-    alignSelf: 'stretch',
-  },
-  reportEditFull: {
-    borderRadius: 14,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f3f3f5',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-    alignSelf: 'stretch',
-  },
   reviewTxt: { fontSize: 14, fontWeight: '800', color: lead },
   reviewDone: {
     fontSize: 13,
@@ -697,30 +655,6 @@ const styles = StyleSheet.create({
     color: textSecondary,
   },
   confirmHint: { fontSize: 13, color: textSecondary, lineHeight: 18 },
-  confirmBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: 14,
-    paddingVertical: 12,
-    backgroundColor: '#eaf3de',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#c0dd97',
-  },
-  confirmBtnFull: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: 14,
-    paddingVertical: 12,
-    backgroundColor: '#eaf3de',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#c0dd97',
-    alignSelf: 'stretch',
-  },
   confirmTxt: { fontSize: 14, fontWeight: '800', color: '#27500a' },
   confirmedDone: {
     fontSize: 13,

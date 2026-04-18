@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -41,6 +42,8 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
   const [photoMime, setPhotoMime] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(Boolean(reportId));
+  /** False after you confirm receipt — report is view-only. */
+  const [canEditReport, setCanEditReport] = useState(true);
 
   const load = useCallback(async () => {
     if (!reportId) return;
@@ -50,6 +53,7 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
       const r = res.data.report;
       setDetails(r.details ?? '');
       setExistingEvidenceUrl(r.evidencePhoto ?? '');
+      setCanEditReport(r.canEdit !== false);
     } catch (e: unknown) {
       alertOk('Error', apiErrorMessage(e, 'Could not load report'), () => navigation.goBack());
     } finally {
@@ -101,6 +105,7 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
   };
 
   const submit = async () => {
+    if (!canEditReport) return;
     let evidenceUrl = existingEvidenceUrl;
     if (photoUri) {
       evidenceUrl = await uploadEvidence();
@@ -133,6 +138,7 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
   };
 
   const previewUri = photoUri || existingEvidenceUrl || undefined;
+  const readOnly = Boolean(reportId) && !canEditReport;
 
   return (
     <View style={styles.flex}>
@@ -149,35 +155,62 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
           contentContainerStyle={[styles.scroll, { gap: FORM_SCROLL_GAP }]}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.head}>{reportId ? 'Edit report' : 'Report an issue'}</Text>
-          <Text style={styles.subHead}>
-            For: {bookTitle}. Use this after an accepted swap if something went wrong. One report per exchange per
-            person.
+          <Text style={styles.head}>
+            {readOnly ? 'Your report' : reportId ? 'Edit report' : 'Report an issue'}
           </Text>
+          <Text style={styles.subHead}>
+            For: {bookTitle}.{' '}
+            {reportId
+              ? readOnly
+                ? 'This report is read-only because you already confirmed receipt.'
+                : 'Update your report before you confirm receipt. After confirming, only a review is allowed.'
+              : 'File this before you tap Confirm receipt on the request. After confirming, you can only leave a review.'}
+          </Text>
+          {readOnly ? (
+            <Text style={styles.lockedBanner}>Confirmed — editing this report is no longer available.</Text>
+          ) : null}
           <Text style={styles.label}>What happened?</Text>
-          <TextInput
-            value={details}
-            onChangeText={setDetails}
-            placeholder="Describe the problem (condition, no-show, etc.)"
-            placeholderTextColor={warmHaze}
-            style={styles.input}
-            multiline
-            textAlignVertical="top"
-          />
+          {readOnly ? (
+            <Text style={styles.readOnlyDetails}>{details || '—'}</Text>
+          ) : (
+            <TextInput
+              value={details}
+              onChangeText={setDetails}
+              placeholder="Describe the problem (condition, no-show, etc.)"
+              placeholderTextColor={warmHaze}
+              style={styles.input}
+              multiline
+              textAlignVertical="top"
+            />
+          )}
           <Text style={styles.label}>Evidence photo</Text>
-          <FormImageAttachment
-            previewUri={previewUri}
-            onPick={pick}
-            onRemove={() => {
-              setPhotoUri(null);
-              setPhotoMime(null);
-              setExistingEvidenceUrl('');
-            }}
-            emptyHint="Tap to add a photo (required)"
-          />
-          <Pressable style={[styles.submit, cardShadow]} onPress={() => void submit()} disabled={busy}>
-            {busy ? <ActivityIndicator color={lead} /> : <Text style={styles.submitTxt}>{reportId ? 'Save' : 'Submit report'}</Text>}
-          </Pressable>
+          {readOnly ? (
+            existingEvidenceUrl ? (
+              <Image source={{ uri: existingEvidenceUrl }} style={styles.evidenceImg} resizeMode="cover" />
+            ) : (
+              <Text style={styles.readOnlyDetails}>No photo on file.</Text>
+            )
+          ) : (
+            <FormImageAttachment
+              previewUri={previewUri}
+              onPick={pick}
+              onRemove={() => {
+                setPhotoUri(null);
+                setPhotoMime(null);
+                setExistingEvidenceUrl('');
+              }}
+              emptyHint="Tap to add a photo (required)"
+            />
+          )}
+          {!readOnly ? (
+            <Pressable style={[styles.submit, cardShadow]} onPress={() => void submit()} disabled={busy}>
+              {busy ? (
+                <ActivityIndicator color={lead} />
+              ) : (
+                <Text style={styles.submitTxt}>{reportId ? 'Save' : 'Submit report'}</Text>
+              )}
+            </Pressable>
+          ) : null}
         </ScrollView>
       )}
     </View>
@@ -192,6 +225,32 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 20, paddingBottom: 40, paddingTop: 8 },
   head: { fontSize: 22, fontWeight: '800', color: lead },
   subHead: { fontSize: 14, color: textSecondary, lineHeight: 20, marginTop: 4 },
+  lockedBanner: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#854f0b',
+    backgroundColor: '#faeeda',
+    padding: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  readOnlyDetails: {
+    fontSize: 16,
+    color: lead,
+    lineHeight: 22,
+    backgroundColor: '#f3f3f5',
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+    padding: 14,
+    minHeight: 80,
+  },
+  evidenceImg: {
+    width: '100%',
+    height: 200,
+    borderRadius: 16,
+    backgroundColor: '#eee',
+  },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
   input: {
     minHeight: 100,

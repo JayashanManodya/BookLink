@@ -80,7 +80,10 @@ export function MyReportsScreen({ navigation }: Props) {
         </Pressable>
       </View>
       <Text style={styles.title}>My exchange reports</Text>
-      <Text style={styles.subtitle}>View, edit, or delete reports you filed after an accepted swap.</Text>
+      <Text style={styles.subtitle}>
+        Reports filed before you confirm receipt can be edited or deleted. After you confirm, they stay visible but are
+        read-only.
+      </Text>
       {loading ? (
         <ActivityIndicator style={{ marginTop: 24 }} color={crunch} />
       ) : error ? (
@@ -90,36 +93,44 @@ export function MyReportsScreen({ navigation }: Props) {
           {reports.length === 0 ? (
             <Text style={styles.empty}>You have not filed any reports yet.</Text>
           ) : (
-            reports.map((r) => (
-              <View key={r._id} style={[styles.card, cardShadow]}>
-                <View style={styles.row}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.bookTitle}>{r.bookTitle || 'Exchange'}</Text>
-                    <Text style={styles.status}>Status: {r.status}</Text>
+            reports.map((r) => {
+              const editable = r.canEdit !== false;
+              return (
+                <View key={r._id} style={[styles.card, cardShadow]}>
+                  <View style={styles.row}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.bookTitle}>{r.bookTitle || 'Exchange'}</Text>
+                      <Text style={styles.status}>Status: {r.status}</Text>
+                      {!editable ? (
+                        <Text style={styles.lockedHint}>Locked after you confirmed receipt</Text>
+                      ) : null}
+                    </View>
+                    {editable ? (
+                      <Pressable onPress={() => remove(r)} hitSlop={8}>
+                        <Ionicons name="trash-outline" size={20} color="#b3261e" />
+                      </Pressable>
+                    ) : null}
                   </View>
-                  <Pressable onPress={() => remove(r)} hitSlop={8}>
-                    <Ionicons name="trash-outline" size={20} color="#b3261e" />
+                  {r.details ? <Text style={styles.details}>{r.details}</Text> : null}
+                  {r.evidencePhoto ? (
+                    <Image source={{ uri: r.evidencePhoto }} style={styles.evidence} resizeMode="cover" />
+                  ) : null}
+                  <Pressable
+                    style={styles.editBtn}
+                    onPress={() =>
+                      navigation.navigate('ReportExchange', {
+                        exchangeRequestId: r.exchangeRequestId,
+                        bookTitle: r.bookTitle || 'Book',
+                        reportId: r._id,
+                      })
+                    }
+                  >
+                    <Text style={styles.editTxt}>{editable ? 'Edit report' : 'View report'}</Text>
+                    <Ionicons name="chevron-forward" size={18} color={lead} />
                   </Pressable>
                 </View>
-                {r.details ? <Text style={styles.details}>{r.details}</Text> : null}
-                {r.evidencePhoto ? (
-                  <Image source={{ uri: r.evidencePhoto }} style={styles.evidence} resizeMode="cover" />
-                ) : null}
-                <Pressable
-                  style={styles.editBtn}
-                  onPress={() =>
-                    navigation.navigate('ReportExchange', {
-                      exchangeRequestId: r.exchangeRequestId,
-                      bookTitle: r.bookTitle || 'Book',
-                      reportId: r._id,
-                    })
-                  }
-                >
-                  <Text style={styles.editTxt}>Edit report</Text>
-                  <Ionicons name="chevron-forward" size={18} color={lead} />
-                </Pressable>
-              </View>
-            ))
+              );
+            })
           )}
         </ScrollView>
       )}
@@ -148,6 +159,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   bookTitle: { fontSize: 17, fontWeight: '800', color: lead },
   status: { fontSize: 12, fontWeight: '700', color: warmHaze, marginTop: 2, textTransform: 'capitalize' },
+  lockedHint: { fontSize: 12, fontWeight: '600', color: '#854f0b', marginTop: 4 },
   details: { fontSize: 14, color: textSecondary, lineHeight: 20 },
   evidence: { width: '100%', height: 120, borderRadius: 12, backgroundColor: '#eee' },
   editBtn: {

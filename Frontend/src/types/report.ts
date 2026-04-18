@@ -6,6 +6,8 @@ export type ExchangeReport = {
   evidencePhoto: string;
   status: 'open' | 'reviewed' | 'dismissed';
   bookTitle: string;
+  /** False after you confirm receipt; report stays visible but is read-only. */
+  canEdit?: boolean;
   createdAt?: string;
   updatedAt?: string;
 };

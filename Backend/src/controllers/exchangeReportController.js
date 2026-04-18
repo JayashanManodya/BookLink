@@ -5,6 +5,7 @@ import { ExchangeReport } from '../models/ExchangeReport.js';
 
 function serializeReport(doc, extra = {}) {
   const o = doc.toObject ? doc.toObject() : doc;
+  const canEdit = typeof extra.canEdit === 'boolean' ? extra.canEdit : true;
   return {
     _id: String(o._id),
     exchangeRequestId: String(o.exchangeRequestId),
@@ -13,12 +14,18 @@ function serializeReport(doc, extra = {}) {
     evidencePhoto: o.evidencePhoto ?? '',
     status: o.status ?? 'open',
     bookTitle: typeof extra.bookTitle === 'string' ? extra.bookTitle : '',
+    canEdit,
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,
   };
 }
 
-async function assertParticipant(exchangeRequestId, clerkUserId) {
+function canRequesterEditReport(exchangeLean) {
+  if (!exchangeLean) return false;
+  return !exchangeLean.requesterConfirmedAt;
+}
+
+async function assertCreateReport(exchangeRequestId, clerkUserId) {
   if (!mongoose.isValidObjectId(exchangeRequestId)) {
     return { error: 'Invalid exchange request id', status: 400 };
   }
@@ -26,15 +33,18 @@ async function assertParticipant(exchangeRequestId, clerkUserId) {
   if (!row) {
     return { error: 'Exchange request not found', status: 404 };
   }
-  if (row.ownerClerkUserId !== clerkUserId && row.requesterClerkUserId !== clerkUserId) {
-    return { error: 'Not allowed', status: 403 };
+  if (row.requesterClerkUserId !== clerkUserId) {
+    return { error: 'Only the reader who requested the book can file this report', status: 403 };
   }
   if (row.status !== 'accepted') {
     return { error: 'Reports are only allowed for accepted exchanges', status: 400 };
   }
-  const isRequester = row.requesterClerkUserId === clerkUserId;
-  if (isRequester && !row.requesterConfirmedAt) {
-    return { error: 'Confirm you received the book before filing a report', status: 400 };
+  if (row.requesterConfirmedAt) {
+    return {
+      error:
+        'You can only report before confirming receipt. After confirming, you can leave a review instead.',
+      status: 400,
+    };
   }
   return { row };
 }
@@ -42,7 +52,7 @@ async function assertParticipant(exchangeRequestId, clerkUserId) {
 export async function createExchangeReport(req, res, next) {
   try {
     const { exchangeRequestId, details, evidencePhoto } = req.body ?? {};
-    const chk = await assertParticipant(exchangeRequestId, req.clerkUserId);
+    const chk = await assertCreateReport(exchangeRequestId, req.clerkUserId);
     if (chk.error) {
       return res.status(chk.status).json({ error: chk.error });
     }
@@ -67,7 +77,7 @@ export async function createExchangeReport(req, res, next) {
     }
     const book = await Book.findById(chk.row.bookId).lean();
     return res.status(201).json({
-      report: serializeReport(doc.toObject(), { bookTitle: book?.title ?? '' }),
+      report: serializeReport(doc.toObject(), { bookTitle: book?.title ?? '', canEdit: true }),
     });
   } catch (err) {
     return next(err);
@@ -87,7 +97,8 @@ export async function listMyExchangeReports(req, res, next) {
     const reports = rows.map((r) => {
       const ex = byEx[String(r.exchangeRequestId)];
       const book = ex ? byBook[String(ex.bookId)] : null;
-      return serializeReport(r, { bookTitle: book?.title ?? '' });
+      const canEdit = canRequesterEditReport(ex);
+      return serializeReport(r, { bookTitle: book?.title ?? '', canEdit });
     });
     return res.json({ reports });
   } catch (err) {
@@ -110,7 +121,8 @@ export async function getExchangeReportById(req, res, next) {
     }
     const ex = await ExchangeRequest.findById(row.exchangeRequestId).lean();
     const book = ex ? await Book.findById(ex.bookId).lean() : null;
-    return res.json({ report: serializeReport(row, { bookTitle: book?.title ?? '' }) });
+    const canEdit = canRequesterEditReport(ex);
+    return res.json({ report: serializeReport(row, { bookTitle: book?.title ?? '', canEdit }) });
   } catch (err) {
     return next(err);
   }
@@ -129,6 +141,12 @@ export async function updateExchangeReport(req, res, next) {
     if (row.reporterClerkUserId !== req.clerkUserId) {
       return res.status(403).json({ error: 'Not allowed' });
     }
+    const ex = await ExchangeRequest.findById(row.exchangeRequestId).lean();
+    if (!canRequesterEditReport(ex)) {
+      return res.status(400).json({
+        error: 'This report can no longer be edited after you confirmed receipt.',
+      });
+    }
     const { details, evidencePhoto } = req.body ?? {};
     if (typeof details === 'string') {
       row.details = details.trim().slice(0, 4000);
@@ -141,9 +159,12 @@ export async function updateExchangeReport(req, res, next) {
       row.evidencePhoto = p.slice(0, 2000);
     }
     await row.save();
-    const ex = await ExchangeRequest.findById(row.exchangeRequestId).lean();
-    const book = ex ? await Book.findById(ex.bookId).lean() : null;
-    return res.json({ report: serializeReport(row.toObject(), { bookTitle: book?.title ?? '' }) });
+    const exAfter = await ExchangeRequest.findById(row.exchangeRequestId).lean();
+    const book = exAfter ? await Book.findById(exAfter.bookId).lean() : null;
+    const canEdit = canRequesterEditReport(exAfter);
+    return res.json({
+      report: serializeReport(row.toObject(), { bookTitle: book?.title ?? '', canEdit }),
+    });
   } catch (err) {
     return next(err);
   }
@@ -161,6 +182,12 @@ export async function deleteExchangeReport(req, res, next) {
     }
     if (row.reporterClerkUserId !== req.clerkUserId) {
       return res.status(403).json({ error: 'Not allowed' });
+    }
+    const ex = await ExchangeRequest.findById(row.exchangeRequestId).lean();
+    if (!canRequesterEditReport(ex)) {
+      return res.status(400).json({
+        error: 'This report can no longer be deleted after you confirmed receipt.',
+      });
     }
     await row.deleteOne();
     return res.json({ ok: true });
