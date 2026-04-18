@@ -21,6 +21,8 @@ export type ExchangeRequest = {
   requesterConfirmedAt?: string | null;
   /** True when a review exists for this exchange (one per swap). */
   hasExchangeReview?: boolean;
+  /** Your report id for this exchange, if you filed one. */
+  myExchangeReportId?: string | null;
   createdAt?: string;
   updatedAt?: string;
 };

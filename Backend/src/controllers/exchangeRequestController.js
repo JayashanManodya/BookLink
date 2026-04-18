@@ -5,6 +5,7 @@ import { CollectionPoint } from '../models/CollectionPoint.js';
 import { ExchangeRequest } from '../models/ExchangeRequest.js';
 import { ExchangeMessage } from '../models/ExchangeMessage.js';
 import { Review } from '../models/Review.js';
+import { ExchangeReport } from '../models/ExchangeReport.js';
 import { normalizeChatImageUrl } from '../utils/chatImageUrl.js';
 
 async function shortDisplayName(clerkUserId) {
@@ -72,6 +73,7 @@ function serializeRequest(doc, bookLean, profileById = {}, extra = {}) {
     status: o.status,
     requesterConfirmedAt: o.requesterConfirmedAt ? new Date(o.requesterConfirmedAt).toISOString() : null,
     hasExchangeReview: Boolean(extra.hasExchangeReview),
+    myExchangeReportId: extra.myExchangeReportId != null ? String(extra.myExchangeReportId) : null,
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,
   };
@@ -115,7 +117,18 @@ export async function getExchangeRequestById(req, res, next) {
     const hasExchangeReview = Boolean(
       await Review.exists({ exchangeRequestId: chk.row._id })
     );
-    return res.json({ request: serializeRequest(chk.row, book, userProfiles, { hasExchangeReview }) });
+    const myReport = await ExchangeReport.findOne({
+      exchangeRequestId: chk.row._id,
+      reporterClerkUserId: req.clerkUserId,
+    })
+      .select('_id')
+      .lean();
+    return res.json({
+      request: serializeRequest(chk.row, book, userProfiles, {
+        hasExchangeReview,
+        myExchangeReportId: myReport?._id ?? null,
+      }),
+    });
   } catch (err) {
     return next(err);
   }
@@ -139,9 +152,19 @@ export async function listExchangeRequests(req, res, next) {
       .select('exchangeRequestId')
       .lean();
     const reviewedIds = new Set(reviewedRows.map((rev) => String(rev.exchangeRequestId)));
+    const myReportRows = await ExchangeReport.find({
+      reporterClerkUserId: me,
+      exchangeRequestId: { $in: rowIds },
+    })
+      .select('exchangeRequestId _id')
+      .lean();
+    const myReportIdByExchangeId = Object.fromEntries(
+      myReportRows.map((rep) => [String(rep.exchangeRequestId), String(rep._id)])
+    );
     const requests = rows.map((r) =>
       serializeRequest(r, byId[String(r.bookId)], userProfiles, {
         hasExchangeReview: reviewedIds.has(String(r._id)),
+        myExchangeReportId: myReportIdByExchangeId[String(r._id)] ?? null,
       })
     );
     return res.json({ requests });
@@ -472,8 +495,17 @@ export async function confirmExchangeRequestReceipt(req, res, next) {
     const book = await Book.findById(row.bookId).lean();
     const userProfiles = await getPublicProfilesById([row.requesterClerkUserId, row.ownerClerkUserId]);
     const hasExchangeReview = Boolean(await Review.exists({ exchangeRequestId: row._id }));
+    const myReport = await ExchangeReport.findOne({
+      exchangeRequestId: row._id,
+      reporterClerkUserId: req.clerkUserId,
+    })
+      .select('_id')
+      .lean();
     return res.json({
-      request: serializeRequest(row.toObject(), book, userProfiles, { hasExchangeReview }),
+      request: serializeRequest(row.toObject(), book, userProfiles, {
+        hasExchangeReview,
+        myExchangeReportId: myReport?._id ?? null,
+      }),
     });
   } catch (err) {
     return next(err);

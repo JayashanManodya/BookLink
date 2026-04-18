@@ -1,4 +1,4 @@
-import type { UserReviewsParams } from './sharedScreenTypes';
+import type { ReportExchangeParams, UserReviewsParams } from './sharedScreenTypes';
 
 export type ProfileStackParamList = {
   ProfileHome: undefined;
@@ -10,4 +10,6 @@ export type ProfileStackParamList = {
   MyPoints: undefined;
   UserReviews: UserReviewsParams;
   MyReviews: undefined;
+  MyReports: undefined;
+  ReportExchange: ReportExchangeParams;
 };

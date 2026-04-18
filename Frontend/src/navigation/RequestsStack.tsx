@@ -3,6 +3,7 @@ import { ChatsInboxScreen } from '../screens/ChatsInboxScreen';
 import { RequestsScreen } from '../screens/RequestsScreen';
 import { RequestChatScreen } from '../screens/RequestChatScreen';
 import { WriteReviewScreen } from '../screens/WriteReviewScreen';
+import { ReportExchangeScreen } from '../screens/ReportExchangeScreen';
 import type { RequestsStackParamList } from './requestsStackTypes';
 
 const Stack = createNativeStackNavigator<RequestsStackParamList>();
@@ -18,6 +19,7 @@ export function RequestsStack() {
       <Stack.Screen name="RequestsHome" component={RequestsScreen} />
       <Stack.Screen name="RequestChat" component={RequestChatScreen} />
       <Stack.Screen name="WriteReview" component={WriteReviewScreen} />
+      <Stack.Screen name="ReportExchange" component={ReportExchangeScreen} />
     </Stack.Navigator>
   );
 }

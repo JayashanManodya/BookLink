@@ -1,3 +1,5 @@
+import type { ReportExchangeParams } from './sharedScreenTypes';
+
 export type RequestsStackParamList = {
   ChatsInbox: undefined;
   RequestsHome: undefined;
@@ -7,4 +9,5 @@ export type RequestsStackParamList = {
     revieweeClerkUserId: string;
     revieweeName: string;
   };
+  ReportExchange: ReportExchangeParams;
 };

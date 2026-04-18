@@ -316,23 +316,83 @@ export function RequestsScreen({ navigation }: Props) {
                         <Text style={styles.confirmedDone}>
                           <Ionicons name="checkmark-circle" size={14} color="#27500a" /> You confirmed receipt of this book
                         </Text>
-                        {!r.hasExchangeReview ? (
-                          <Pressable
-                            style={styles.reviewBtn}
-                            onPress={() =>
-                              navigation.navigate('WriteReview', {
-                                exchangeRequestId: r._id,
-                                revieweeClerkUserId: r.ownerClerkUserId,
-                                revieweeName: r.ownerDisplayName || 'Lister',
-                              })
-                            }
-                          >
-                            <Text style={styles.reviewTxt}>Leave a review</Text>
-                          </Pressable>
-                        ) : (
-                          <Text style={styles.reviewDone}>You reviewed this exchange</Text>
-                        )}
+                        <View style={styles.postConfirmRow}>
+                          {!r.hasExchangeReview ? (
+                            <Pressable
+                              style={styles.reviewBtnHalf}
+                              onPress={() =>
+                                navigation.navigate('WriteReview', {
+                                  exchangeRequestId: r._id,
+                                  revieweeClerkUserId: r.ownerClerkUserId,
+                                  revieweeName: r.ownerDisplayName || 'Lister',
+                                })
+                              }
+                            >
+                              <Text style={styles.reviewTxt}>Leave a review</Text>
+                            </Pressable>
+                          ) : (
+                            <Text style={[styles.reviewDone, styles.postConfirmHalf]}>You reviewed this exchange</Text>
+                          )}
+                          {!r.myExchangeReportId ? (
+                            <Pressable
+                              style={styles.reportBtnHalf}
+                              onPress={() =>
+                                navigation.navigate('ReportExchange', {
+                                  exchangeRequestId: r._id,
+                                  bookTitle: r.bookTitle || 'Book',
+                                })
+                              }
+                            >
+                              <Ionicons name="flag-outline" size={16} color="#8b2500" />
+                              <Text style={styles.reportTxt}>Report</Text>
+                            </Pressable>
+                          ) : (
+                            <Pressable
+                              style={styles.reportEditHalf}
+                              onPress={() =>
+                                navigation.navigate('ReportExchange', {
+                                  exchangeRequestId: r._id,
+                                  bookTitle: r.bookTitle || 'Book',
+                                  reportId: r.myExchangeReportId,
+                                })
+                              }
+                            >
+                              <Text style={styles.reportEditTxt}>Your report</Text>
+                            </Pressable>
+                          )}
+                        </View>
                       </>
+                    )}
+                  </View>
+                ) : null}
+                {tab === 'received' && r.status === 'accepted' ? (
+                  <View style={styles.ownerReportBlock}>
+                    {!r.myExchangeReportId ? (
+                      <Pressable
+                        style={styles.reportBtnFull}
+                        onPress={() =>
+                          navigation.navigate('ReportExchange', {
+                            exchangeRequestId: r._id,
+                            bookTitle: r.bookTitle || 'Book',
+                          })
+                        }
+                      >
+                        <Ionicons name="flag-outline" size={17} color="#8b2500" />
+                        <Text style={styles.reportTxt}>Report an issue with this swap</Text>
+                      </Pressable>
+                    ) : (
+                      <Pressable
+                        style={styles.reportEditFull}
+                        onPress={() =>
+                          navigation.navigate('ReportExchange', {
+                            exchangeRequestId: r._id,
+                            bookTitle: r.bookTitle || 'Book',
+                            reportId: r.myExchangeReportId,
+                          })
+                        }
+                      >
+                        <Text style={styles.reportEditTxt}>View or edit your report</Text>
+                      </Pressable>
                     )}
                   </View>
                 ) : null}
@@ -568,7 +628,11 @@ const styles = StyleSheet.create({
   chatTxt: { fontSize: 14, fontWeight: '700', color: lead },
   offered: { width: '100%', height: 140, borderRadius: 12, marginTop: 4, backgroundColor: chineseSilver },
   receiptPromptBlock: { marginTop: 4, gap: 6 },
-  reviewBtn: {
+  postConfirmRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4, alignItems: 'stretch' },
+  postConfirmHalf: { flex: 1, minWidth: '42%', justifyContent: 'center' },
+  reviewBtnHalf: {
+    flex: 1,
+    minWidth: '42%',
     borderRadius: 14,
     paddingVertical: 12,
     alignItems: 'center',
@@ -576,6 +640,55 @@ const styles = StyleSheet.create({
     backgroundColor: crunch,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
+  },
+  reportBtnHalf: {
+    flex: 1,
+    minWidth: '42%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 14,
+    paddingVertical: 12,
+    backgroundColor: '#fff5f0',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e8c4b8',
+  },
+  reportEditHalf: {
+    flex: 1,
+    minWidth: '42%',
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f3f3f5',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+  },
+  reportEditTxt: { fontSize: 14, fontWeight: '800', color: lead },
+  reportTxt: { fontSize: 14, fontWeight: '800', color: '#8b2500' },
+  ownerReportBlock: { marginTop: 4, gap: 6 },
+  reportBtnFull: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 14,
+    paddingVertical: 12,
+    backgroundColor: '#fff5f0',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e8c4b8',
+    alignSelf: 'stretch',
+  },
+  reportEditFull: {
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f3f3f5',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+    alignSelf: 'stretch',
   },
   reviewTxt: { fontSize: 14, fontWeight: '800', color: lead },
   reviewDone: {
