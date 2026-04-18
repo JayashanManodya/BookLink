@@ -196,6 +196,40 @@ export async function createExchangeRequest(req, res, next) {
   }
 }
 
+export async function updateExchangeRequest(req, res, next) {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+    const row = await ExchangeRequest.findById(id);
+    if (!row) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+    if (row.requesterClerkUserId !== req.clerkUserId) {
+      return res.status(403).json({ error: 'Only the requester can edit this request' });
+    }
+    if (row.status !== 'pending') {
+      return res.status(400).json({ error: 'Only pending requests can be edited' });
+    }
+    const { message, offeredBookPhoto } = req.body ?? {};
+    if (typeof message === 'string') {
+      row.message = message.slice(0, 2000);
+    }
+    if (typeof offeredBookPhoto === 'string') {
+      row.offeredBookPhoto = offeredBookPhoto.trim().slice(0, 2000);
+    } else if (offeredBookPhoto === null) {
+      row.offeredBookPhoto = '';
+    }
+    await row.save();
+    const book = await Book.findById(row.bookId).lean();
+    const userProfiles = await getPublicProfilesById([row.requesterClerkUserId, row.ownerClerkUserId]);
+    return res.json({ request: serializeRequest(row.toObject(), book, userProfiles) });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 export async function updateExchangeRequestStatus(req, res, next) {
   try {
     const { id } = req.params;

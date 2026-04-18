@@ -3,10 +3,12 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
@@ -16,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, apiErrorMessage } from '../lib/api';
 import { confirmDestructive } from '../lib/platformAlert';
+import { pickChatImageFromLibrary } from '../lib/pickChatImage';
+import { uploadChatImage } from '../lib/uploadChatImage';
 import { SignInGateCard } from '../components/SignInGateCard';
 import type { RequestsStackParamList } from '../navigation/requestsStackTypes';
 import {
@@ -41,6 +45,14 @@ export function RequestsScreen({ navigation }: Props) {
   const [requests, setRequests] = useState<ExchangeRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editBookTitle, setEditBookTitle] = useState('');
+  const [editMessage, setEditMessage] = useState('');
+  const [editPhotoUrl, setEditPhotoUrl] = useState('');
+  const [editPhotoLocalUri, setEditPhotoLocalUri] = useState<string | null>(null);
+  const [editPhotoMime, setEditPhotoMime] = useState<string | null>(null);
+  const [editBusy, setEditBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -91,6 +103,67 @@ export function RequestsScreen({ navigation }: Props) {
       confirmStyle: 'default',
       onConfirm: () => void confirmReceipt(id),
     });
+  };
+
+  const openEdit = (r: ExchangeRequest) => {
+    setEditId(r._id);
+    setEditBookTitle(r.bookTitle || 'Book');
+    setEditMessage(r.message || '');
+    setEditPhotoUrl(r.offeredBookPhoto || '');
+    setEditPhotoLocalUri(null);
+    setEditPhotoMime(null);
+    setEditOpen(true);
+  };
+
+  const closeEdit = () => {
+    if (editBusy) return;
+    setEditOpen(false);
+    setEditId(null);
+    setEditPhotoLocalUri(null);
+    setEditPhotoMime(null);
+  };
+
+  const pickEditPhoto = async () => {
+    const picked = await pickChatImageFromLibrary();
+    if (!picked) return;
+    setEditPhotoLocalUri(picked.uri);
+    setEditPhotoMime(picked.mimeType);
+  };
+
+  const removeEditPhoto = () => {
+    setEditPhotoLocalUri(null);
+    setEditPhotoMime(null);
+    setEditPhotoUrl('');
+  };
+
+  const saveEdit = async () => {
+    if (!editId || editBusy) return;
+    setEditBusy(true);
+    try {
+      let finalPhoto = editPhotoUrl;
+      if (editPhotoLocalUri) {
+        const url = await uploadChatImage(editPhotoLocalUri, editPhotoMime);
+        if (!url) {
+          Alert.alert('Upload', 'Could not upload photo.');
+          setEditBusy(false);
+          return;
+        }
+        finalPhoto = url;
+      }
+      await api.patch(`/api/requests/${editId}/edit`, {
+        message: editMessage.trim(),
+        offeredBookPhoto: finalPhoto || '',
+      });
+      setEditOpen(false);
+      setEditId(null);
+      setEditPhotoLocalUri(null);
+      setEditPhotoMime(null);
+      void load();
+    } catch (e: unknown) {
+      Alert.alert('Error', apiErrorMessage(e, 'Could not save changes'));
+    } finally {
+      setEditBusy(false);
+    }
   };
 
   const deleteRequest = async (id: string) => {
@@ -205,19 +278,31 @@ export function RequestsScreen({ navigation }: Props) {
                     </View>
                   </View>
                   <View style={styles.rightTop}>
-                    <Pressable
-                      style={styles.deleteBtn}
-                      onPress={() =>
-                        tab === 'sent' && r.status === 'pending' ? cancelSent(r._id) : confirmDeleteRequest(r._id)
-                      }
-                      hitSlop={8}
-                    >
-                      <Ionicons
-                        name={tab === 'sent' && r.status === 'pending' ? 'close-circle-outline' : 'trash-outline'}
-                        size={16}
-                        color="#b3261e"
-                      />
-                    </Pressable>
+                    <View style={styles.rightBtnRow}>
+                      {tab === 'sent' && r.status === 'pending' ? (
+                        <Pressable
+                          style={styles.editBtn}
+                          onPress={() => openEdit(r)}
+                          hitSlop={8}
+                          accessibilityLabel="Edit request"
+                        >
+                          <Ionicons name="create-outline" size={16} color={lead} />
+                        </Pressable>
+                      ) : null}
+                      <Pressable
+                        style={styles.deleteBtn}
+                        onPress={() =>
+                          tab === 'sent' && r.status === 'pending' ? cancelSent(r._id) : confirmDeleteRequest(r._id)
+                        }
+                        hitSlop={8}
+                      >
+                        <Ionicons
+                          name={tab === 'sent' && r.status === 'pending' ? 'close-circle-outline' : 'trash-outline'}
+                          size={16}
+                          color="#b3261e"
+                        />
+                      </Pressable>
+                    </View>
                     <Text style={[styles.status, statusStyle(r.status)]}>{r.status}</Text>
                   </View>
                 </View>
@@ -328,6 +413,67 @@ export function RequestsScreen({ navigation }: Props) {
           )}
         </ScrollView>
       )}
+
+      <Modal visible={editOpen} animationType="slide" transparent onRequestClose={closeEdit}>
+        <View style={styles.modalRoot}>
+          <Pressable style={styles.modalBackdrop} onPress={closeEdit} />
+          <View style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+            <Text style={styles.modalTitle}>Edit request</Text>
+            <Text style={styles.modalSub}>For: {editBookTitle}</Text>
+            <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 420 }}>
+              <Text style={styles.modalFieldLabel}>Message to the owner</Text>
+              <TextInput
+                value={editMessage}
+                onChangeText={setEditMessage}
+                placeholder='e.g. "I can offer Physics past papers in good condition"'
+                placeholderTextColor={warmHaze}
+                style={styles.modalInput}
+                multiline
+                textAlignVertical="top"
+                numberOfLines={5}
+              />
+              <Text style={styles.modalFieldLabel}>Offered book photo</Text>
+              {editPhotoLocalUri || editPhotoUrl ? (
+                <View style={styles.editPhotoWrap}>
+                  <Image
+                    source={{ uri: editPhotoLocalUri || editPhotoUrl }}
+                    style={styles.editPhoto}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.editPhotoActions}>
+                    <Pressable style={styles.editPhotoBtn} onPress={() => void pickEditPhoto()}>
+                      <Text style={styles.editPhotoBtnTxt}>Change</Text>
+                    </Pressable>
+                    <Pressable style={styles.editPhotoBtnRemove} onPress={removeEditPhoto}>
+                      <Text style={styles.editPhotoBtnRemoveTxt}>Remove</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : (
+                <Pressable style={styles.pickBtn} onPress={() => void pickEditPhoto()}>
+                  <Text style={styles.pickTxt}>Add photo of book you offer (optional)</Text>
+                </Pressable>
+              )}
+            </ScrollView>
+            <View style={styles.modalActionsRow}>
+              <Pressable style={styles.modalBackBtn} onPress={closeEdit} disabled={editBusy}>
+                <Text style={styles.modalBackBtnTxt}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalConfirmBtn, editBusy && styles.modalConfirmBtnOff]}
+                onPress={() => void saveEdit()}
+                disabled={editBusy}
+              >
+                {editBusy ? (
+                  <ActivityIndicator color={cascadingWhite} size="small" />
+                ) : (
+                  <Text style={styles.modalConfirmBtnTxt}>Save changes</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -523,4 +669,96 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#27500a',
   },
+  rightBtnRow: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  editBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+    backgroundColor: cascadingWhite,
+  },
+  modalRoot: { flex: 1, justifyContent: 'flex-end' },
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)' },
+  modalSheet: {
+    backgroundColor: cascadingWhite,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    maxHeight: '90%',
+  },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: lead },
+  modalSub: { marginTop: 2, marginBottom: 12, fontSize: 14, color: textSecondary },
+  modalFieldLabel: { fontSize: 13, fontWeight: '800', color: warmHaze, marginTop: 6, marginBottom: 6 },
+  modalInput: {
+    minHeight: 110,
+    backgroundColor: '#f3f3f5',
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: lead,
+  },
+  pickBtn: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+    marginBottom: 8,
+  },
+  pickTxt: { fontSize: 14, fontWeight: '700', color: textSecondary },
+  editPhotoWrap: { gap: 8, marginBottom: 8 },
+  editPhoto: {
+    width: '100%',
+    height: 160,
+    borderRadius: 12,
+    backgroundColor: chineseSilver,
+  },
+  editPhotoActions: { flexDirection: 'row', gap: 8 },
+  editPhotoBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+    backgroundColor: cascadingWhite,
+  },
+  editPhotoBtnTxt: { fontSize: 13, fontWeight: '800', color: lead },
+  editPhotoBtnRemove: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e8bcbc',
+    backgroundColor: '#fdeaea',
+  },
+  editPhotoBtnRemoveTxt: { fontSize: 13, fontWeight: '800', color: '#7a2e2e' },
+  modalActionsRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  modalBackBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+    backgroundColor: cascadingWhite,
+  },
+  modalBackBtnTxt: { fontSize: 15, fontWeight: '800', color: lead },
+  modalConfirmBtn: {
+    flex: 2,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    backgroundColor: lead,
+  },
+  modalConfirmBtnOff: { opacity: 0.7 },
+  modalConfirmBtnTxt: { fontSize: 15, fontWeight: '800', color: cascadingWhite },
 });
