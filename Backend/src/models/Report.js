@@ -20,12 +20,13 @@ const reportSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-reportSchema.pre('validate', function preValidate() {
+reportSchema.pre('validate', function preValidate(next) {
   const hasUser = Boolean(this.reportedUserClerkId?.trim());
   const hasBook = Boolean(this.reportedBookId);
   if (!hasUser && !hasBook) {
     this.invalidate('reportedUserClerkId', 'Either reported user or reported book is required');
   }
+  next();
 });
 
 export const REPORT_REASONS = REASONS;
