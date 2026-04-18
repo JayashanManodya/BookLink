@@ -14,6 +14,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useUser } from '@clerk/clerk-expo';
 import { api } from '../lib/api';
 import type { BrowseStackParamList } from '../navigation/browseStackTypes';
 import { cascadingWhite, chineseSilver, crunch, dreamland, lead, textSecondary, warmHaze } from '../theme/colors';
@@ -46,6 +47,18 @@ type ListParams = {
 
 export function BrowseListScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const { user } = useUser();
+  const greetingName = useMemo(() => {
+    const first = user?.firstName?.trim();
+    if (first) return first;
+    const full = user?.fullName?.trim();
+    if (full) return full.split(/\s+/)[0] ?? full;
+    const uname = user?.username?.trim();
+    if (uname) return uname;
+    const email = user?.primaryEmailAddress?.emailAddress;
+    if (email) return email.split('@')[0] ?? 'Reader';
+    return 'Reader';
+  }, [user]);
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -135,7 +148,7 @@ export function BrowseListScreen({ navigation }: Props) {
       >
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.greetTitle}>Hi, Reader 👋</Text>
+            <Text style={styles.greetTitle} numberOfLines={1}>Hi, {greetingName} 👋</Text>
             <Text style={styles.greetSub}>Explore the world of books</Text>
           </View>
           <Pressable style={styles.avatarCircle} onPress={() => navigation.navigate('AddBook')} hitSlop={8}>

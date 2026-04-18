@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,6 +47,12 @@ export function MyPointsScreen({ navigation }: Props) {
     void load();
   }, [load]);
 
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
+
   const remove = (id: string) => {
     confirmDestructive({
       title: 'Delete point',
@@ -83,9 +90,24 @@ export function MyPointsScreen({ navigation }: Props) {
               <View key={p._id} style={[styles.card, cardShadow]}>
                 <View style={styles.row}>
                   <Text style={styles.name}>{p.name}</Text>
-                  <Pressable onPress={() => remove(p._id)} hitSlop={8}>
-                    <Ionicons name="trash-outline" size={20} color="#b3261e" />
-                  </Pressable>
+                  <View style={styles.iconRow}>
+                    <Pressable
+                      onPress={() => navigation.navigate('SubmitPoint', { pointId: p._id })}
+                      hitSlop={8}
+                      style={styles.iconBtn}
+                      accessibilityLabel="Edit point"
+                    >
+                      <Ionicons name="create-outline" size={20} color={lead} />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => remove(p._id)}
+                      hitSlop={8}
+                      style={styles.iconBtn}
+                      accessibilityLabel="Delete point"
+                    >
+                      <Ionicons name="trash-outline" size={20} color="#b3261e" />
+                    </Pressable>
+                  </View>
                 </View>
                 <Text style={styles.meta}>
                   {p.city} · {p.address}
@@ -115,7 +137,9 @@ const styles = StyleSheet.create({
     backgroundColor: cascadingWhite,
     gap: 6,
   },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  iconRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  iconBtn: { padding: 6, borderRadius: 10 },
   name: { fontSize: 17, fontWeight: '800', color: lead, flex: 1 },
   meta: { fontSize: 14, color: warmHaze },
 });

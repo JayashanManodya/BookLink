@@ -52,7 +52,7 @@ export async function submitPoint(req, res, next) {
 
 export async function getAllPoints(req, res, next) {
   try {
-    const q = {};
+    const q = { addedByClerkUserId: req.clerkUserId };
     const city = typeof req.query.city === 'string' ? req.query.city.trim() : '';
     if (city) {
       q.city = new RegExp(escapeRegex(city), 'i');
@@ -71,7 +71,7 @@ export async function getPointById(req, res, next) {
       return res.status(400).json({ error: 'Invalid id' });
     }
     const point = await CollectionPoint.findById(id).lean();
-    if (!point) {
+    if (!point || point.addedByClerkUserId !== req.clerkUserId) {
       return res.status(404).json({ error: 'Not found' });
     }
     return res.json({ point });
@@ -93,9 +93,27 @@ export async function updatePoint(req, res, next) {
     if (point.addedByClerkUserId !== req.clerkUserId) {
       return res.status(403).json({ error: 'Only the contributor can update this point' });
     }
-    const { name, address, operatingHours, contactNumber, locationPhoto, latitude, longitude } = req.body ?? {};
+    const {
+      name,
+      city,
+      address,
+      association,
+      operatingHours,
+      contactNumber,
+      locationPhoto,
+      latitude,
+      longitude,
+    } = req.body ?? {};
     if (typeof name === 'string') point.name = name.trim().slice(0, 200);
+    if (typeof city === 'string') {
+      const cityTrim = city.trim();
+      if (!COLLECTION_POINT_CITIES.includes(cityTrim)) {
+        return res.status(400).json({ error: 'city must be chosen from the supported city list' });
+      }
+      point.city = cityTrim;
+    }
     if (typeof address === 'string') point.address = address.trim().slice(0, 500);
+    if (typeof association === 'string') point.association = association.trim().slice(0, 200);
     if (typeof operatingHours === 'string') point.operatingHours = operatingHours.trim().slice(0, 300);
     if (typeof contactNumber === 'string') point.contactNumber = contactNumber.trim().slice(0, 40);
     if (typeof locationPhoto === 'string') point.locationPhoto = locationPhoto.trim();

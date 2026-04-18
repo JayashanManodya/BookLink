@@ -13,8 +13,8 @@ const router = Router();
 
 router.post('/', requireClerkAuth, submitPoint);
 router.get('/mine', requireClerkAuth, getMyPoints);
-router.get('/', getAllPoints);
-router.get('/:id', getPointById);
+router.get('/', requireClerkAuth, getAllPoints);
+router.get('/:id', requireClerkAuth, getPointById);
 router.put('/:id', requireClerkAuth, updatePoint);
 router.delete('/:id', requireClerkAuth, deletePoint);
 

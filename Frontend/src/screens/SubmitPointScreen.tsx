@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CityDictionarySelect } from '../components/CityDictionarySelect';
 import { LocationMapPicker } from '../components/LocationMapPicker';
-import { api } from '../lib/api';
+import { api, apiErrorMessage } from '../lib/api';
 import { alertOk } from '../lib/platformAlert';
 import type { ProfileStackParamList } from '../navigation/profileStackTypes';
 import {
@@ -27,6 +27,7 @@ import {
   warmHaze,
 } from '../theme/colors';
 import { cardShadow } from '../theme/shadows';
+import type { CollectionPoint } from '../types/point';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'SubmitPoint'>;
 
@@ -34,8 +35,11 @@ type Props = NativeStackScreenProps<ProfileStackParamList, 'SubmitPoint'>;
 const DEFAULT_PIN_LAT = 7.8731;
 const DEFAULT_PIN_LNG = 80.7718;
 
-export function SubmitPointScreen({ navigation }: Props) {
+export function SubmitPointScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const editingId = route.params?.pointId;
+  const isEdit = Boolean(editingId);
+
   const [pinLat, setPinLat] = useState(DEFAULT_PIN_LAT);
   const [pinLng, setPinLng] = useState(DEFAULT_PIN_LNG);
   const [name, setName] = useState('');
@@ -44,9 +48,40 @@ export function SubmitPointScreen({ navigation }: Props) {
   const [association, setAssociation] = useState('');
   const [operatingHours, setOperatingHours] = useState('');
   const [contactNumber, setContactNumber] = useState('');
+  const [existingPhotoUrl, setExistingPhotoUrl] = useState<string>('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoMime, setPhotoMime] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(isEdit);
+
+  useEffect(() => {
+    if (!isEdit || !editingId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get<{ point: CollectionPoint }>(`/api/points/${editingId}`);
+        if (cancelled) return;
+        const p = res.data.point;
+        if (!p) return;
+        setName(p.name ?? '');
+        setCity(p.city ?? '');
+        setAddress(p.address ?? '');
+        setAssociation(p.association ?? '');
+        setOperatingHours(p.operatingHours ?? '');
+        setContactNumber(p.contactNumber ?? '');
+        setExistingPhotoUrl(p.locationPhoto ?? '');
+        if (typeof p.latitude === 'number') setPinLat(p.latitude);
+        if (typeof p.longitude === 'number') setPinLng(p.longitude);
+      } catch (e: unknown) {
+        alertOk('Error', apiErrorMessage(e, 'Could not load point'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isEdit, editingId]);
 
   const pick = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -65,8 +100,8 @@ export function SubmitPointScreen({ navigation }: Props) {
     }
   };
 
-  const uploadPhoto = async (): Promise<string> => {
-    if (!photoUri) return '';
+  const uploadPhoto = async (): Promise<string | null> => {
+    if (!photoUri) return null;
     const form = new FormData();
     const fname = photoMime?.includes('png') ? 'loc.png' : 'loc.jpg';
     const type = photoMime ?? 'image/jpeg';
@@ -104,8 +139,9 @@ export function SubmitPointScreen({ navigation }: Props) {
     }
     setBusy(true);
     try {
-      const locationPhoto = await uploadPhoto();
-      await api.post('/api/points', {
+      const uploaded = await uploadPhoto();
+      const locationPhoto = uploaded ?? existingPhotoUrl ?? '';
+      const payload = {
         name: name.trim(),
         city: city.trim(),
         address: address.trim(),
@@ -115,14 +151,30 @@ export function SubmitPointScreen({ navigation }: Props) {
         locationPhoto,
         latitude: pinLat,
         longitude: pinLng,
-      });
-      alertOk('Thanks', 'Collection point submitted.', () => navigation.goBack());
+      };
+      if (isEdit && editingId) {
+        await api.put(`/api/points/${editingId}`, payload);
+        alertOk('Saved', 'Collection point updated.', () => navigation.goBack());
+      } else {
+        await api.post('/api/points', payload);
+        alertOk('Thanks', 'Collection point submitted.', () => navigation.goBack());
+      }
     } catch (e: unknown) {
-      alertOk('Error', e instanceof Error ? e.message : 'Could not submit');
+      alertOk('Error', apiErrorMessage(e, isEdit ? 'Could not save changes' : 'Could not submit'));
     } finally {
       setBusy(false);
     }
   };
+
+  if (loading) {
+    return (
+      <View style={[styles.flex, styles.center]}>
+        <ActivityIndicator color={crunch} />
+      </View>
+    );
+  }
+
+  const hasPhoto = Boolean(photoUri || existingPhotoUrl);
 
   return (
     <View style={styles.flex}>
@@ -137,10 +189,12 @@ export function SubmitPointScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
         nestedScrollEnabled
       >
-        <Text style={styles.head}>Suggest a collection point</Text>
+        <Text style={styles.head}>
+          {isEdit ? 'Edit collection point' : 'Add a collection point'}
+        </Text>
         <Text style={styles.mapSectionTitle}>Select location on the map</Text>
         <Text style={styles.mapSectionSub}>
-          The pin marks where exchanges happen. Tap the map or drag the pin — required before you submit.
+          The pin marks where exchanges happen. Tap the map or drag the pin — required before you save.
         </Text>
         <LocationMapPicker
           latitude={pinLat}
@@ -158,10 +212,16 @@ export function SubmitPointScreen({ navigation }: Props) {
         <Field label="Hours (optional)" value={operatingHours} onChange={setOperatingHours} />
         <Field label="Contact (optional)" value={contactNumber} onChange={setContactNumber} />
         <Pressable style={styles.pickBtn} onPress={() => void pick()}>
-          <Text style={styles.pickTxt}>{photoUri ? 'Change photo' : 'Add location photo (optional)'}</Text>
+          <Text style={styles.pickTxt}>
+            {hasPhoto ? 'Change photo' : 'Add location photo (optional)'}
+          </Text>
         </Pressable>
         <Pressable style={[styles.submit, cardShadow]} onPress={() => void submit()} disabled={busy}>
-          {busy ? <ActivityIndicator color={lead} /> : <Text style={styles.submitTxt}>Submit</Text>}
+          {busy ? (
+            <ActivityIndicator color={lead} />
+          ) : (
+            <Text style={styles.submitTxt}>{isEdit ? 'Save changes' : 'Submit'}</Text>
+          )}
         </Pressable>
       </ScrollView>
     </View>
@@ -195,6 +255,7 @@ function Field({
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: cascadingWhite },
+  center: { alignItems: 'center', justifyContent: 'center' },
   topBar: { paddingHorizontal: 12, paddingBottom: 4 },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
   backText: { fontSize: 16, fontWeight: '600', color: lead },

@@ -6,7 +6,7 @@ export type ProfileStackParamList = {
   MyListings: undefined;
   EditListing: { bookId: string };
   BrowsePoints: undefined;
-  SubmitPoint: undefined;
+  SubmitPoint: { pointId?: string } | undefined;
   MyPoints: undefined;
   UserReviews: UserReviewsParams;
   MyReviews: undefined;
