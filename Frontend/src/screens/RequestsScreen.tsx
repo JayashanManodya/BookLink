@@ -21,6 +21,7 @@ import { confirmDestructive } from '../lib/platformAlert';
 import { pickChatImageFromLibrary } from '../lib/pickChatImage';
 import { uploadChatImage } from '../lib/uploadChatImage';
 import { FormImageAttachment } from '../components/FormImageAttachment';
+import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { SignInGateCard } from '../components/SignInGateCard';
 import type { RequestsStackParamList } from '../navigation/requestsStackTypes';
 import {
@@ -421,25 +422,33 @@ export function RequestsScreen({ navigation }: Props) {
           <View style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
             <Text style={styles.modalTitle}>Edit request</Text>
             <Text style={styles.modalSub}>For: {editBookTitle}</Text>
-            <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 420 }}>
-              <Text style={styles.modalFieldLabel}>Message to the owner</Text>
-              <TextInput
-                value={editMessage}
-                onChangeText={setEditMessage}
-                placeholder='e.g. "I can offer Physics past papers in good condition"'
-                placeholderTextColor={warmHaze}
-                style={styles.modalInput}
-                multiline
-                textAlignVertical="top"
-                numberOfLines={5}
-              />
-              <Text style={styles.modalFieldLabel}>Offered book photo</Text>
-              <FormImageAttachment
-                previewUri={editPhotoLocalUri || editPhotoUrl}
-                onPick={pickEditPhoto}
-                onRemove={removeEditPhoto}
-                emptyHint="Tap to add photo of book you offer (optional)"
-              />
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              style={{ maxHeight: 420 }}
+              contentContainerStyle={{ gap: FORM_SCROLL_GAP, paddingBottom: 8 }}
+            >
+              <View style={{ gap: 6 }}>
+                <Text style={styles.modalFieldLabel}>Message to the owner</Text>
+                <TextInput
+                  value={editMessage}
+                  onChangeText={setEditMessage}
+                  placeholder='e.g. "I can offer Physics past papers in good condition"'
+                  placeholderTextColor={warmHaze}
+                  style={styles.modalInput}
+                  multiline
+                  textAlignVertical="top"
+                  numberOfLines={5}
+                />
+              </View>
+              <View style={{ gap: 6 }}>
+                <Text style={styles.modalFieldLabel}>Offered book photo</Text>
+                <FormImageAttachment
+                  previewUri={editPhotoLocalUri || editPhotoUrl}
+                  onPick={pickEditPhoto}
+                  onRemove={removeEditPhoto}
+                  emptyHint="Tap to add photo of book you offer (optional)"
+                />
+              </View>
             </ScrollView>
             <View style={styles.modalActionsRow}>
               <Pressable style={styles.modalBackBtn} onPress={closeEdit} disabled={editBusy}>
@@ -678,7 +687,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: { fontSize: 18, fontWeight: '800', color: lead },
   modalSub: { marginTop: 2, marginBottom: 12, fontSize: 14, color: textSecondary },
-  modalFieldLabel: { fontSize: 13, fontWeight: '800', color: warmHaze, marginTop: 6, marginBottom: 6 },
+  modalFieldLabel: { fontSize: 13, fontWeight: '800', color: warmHaze },
   modalInput: {
     minHeight: 110,
     backgroundColor: '#f3f3f5',
@@ -689,6 +698,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
     color: lead,
+    marginBottom: 2,
   },
   modalActionsRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
   modalBackBtn: {

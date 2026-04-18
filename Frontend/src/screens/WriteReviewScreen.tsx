@@ -25,6 +25,7 @@ import {
   textSecondary,
   warmHaze,
 } from '../theme/colors';
+import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { cardShadow } from '../theme/shadows';
 
 type Props = NativeStackScreenProps<RequestsStackParamList, 'WriteReview'>;
@@ -107,7 +108,10 @@ export function WriteReviewScreen({ navigation, route }: Props) {
           <Text style={styles.backText}>Back</Text>
         </Pressable>
       </View>
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { gap: FORM_SCROLL_GAP }]}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={styles.head}>Rate {revieweeName}</Text>
         <Text style={styles.subHead}>One review per exchange. After you submit, you cannot add another for this swap.</Text>
         <Text style={styles.label}>Rating</Text>
@@ -149,7 +153,7 @@ const styles = StyleSheet.create({
   topBar: { paddingHorizontal: 12, paddingBottom: 4 },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
   backText: { fontSize: 16, fontWeight: '600', color: lead },
-  scroll: { paddingHorizontal: 20, paddingBottom: 40, gap: 12, paddingTop: 8 },
+  scroll: { paddingHorizontal: 20, paddingBottom: 40, paddingTop: 8 },
   head: { fontSize: 22, fontWeight: '800', color: lead },
   subHead: { fontSize: 14, color: textSecondary, lineHeight: 20, marginTop: 4 },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
@@ -166,6 +170,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: lead,
     textAlignVertical: 'top',
+    marginBottom: 2,
   },
   submit: {
     marginTop: 8,

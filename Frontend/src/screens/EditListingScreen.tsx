@@ -28,6 +28,7 @@ import {
   textSecondary,
   warmHaze,
 } from '../theme/colors';
+import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { cardShadow } from '../theme/shadows';
 import type { Book } from '../types/book';
 
@@ -204,7 +205,10 @@ export function EditListingScreen({ navigation, route }: Props) {
         <View style={{ width: 78 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { gap: FORM_SCROLL_GAP }]}
+        keyboardShouldPersistTaps="handled"
+      >
         <FormImageAttachment
           previewUri={coverPreview}
           onPick={pickCover}
@@ -257,7 +261,7 @@ export function EditListingScreen({ navigation, route }: Props) {
               ))}
             </View>
           </View>
-          <View style={styles.rowFieldGrow}>
+          <View style={{ flex: 1, minWidth: 0 }}>
             <Field label="Language" value={language} onChangeText={setLanguage} placeholder="English / Sinhala / Tamil" />
           </View>
         </View>
@@ -364,7 +368,7 @@ function Field({
   numberOfLines?: number;
 }) {
   return (
-    <View style={styles.fieldWrap}>
+    <View style={{ width: '100%', gap: 6 }}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
         value={value}
@@ -393,9 +397,7 @@ const styles = StyleSheet.create({
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, width: 78 },
   backText: { fontSize: 15, fontWeight: '600', color: lead },
   screenTitle: { fontSize: 18, fontWeight: '800', color: lead },
-  scroll: { paddingHorizontal: 20, gap: 12, paddingBottom: 32, paddingTop: 8 },
-  fieldWrap: { width: '100%', gap: 6 },
-  rowFieldGrow: { flex: 1, minWidth: 0 },
+  scroll: { paddingHorizontal: 20, paddingBottom: 32, paddingTop: 8 },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
   input: {
     backgroundColor: '#f3f3f5',
@@ -407,7 +409,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: lead,
   },
-  inputMultiline: { minHeight: 96, paddingTop: 12 },
+  inputMultiline: { minHeight: 96, paddingTop: 12, marginBottom: 2 },
   selectRow: {
     flexDirection: 'row',
     alignItems: 'center',

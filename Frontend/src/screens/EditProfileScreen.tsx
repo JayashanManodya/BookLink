@@ -21,6 +21,7 @@ import {
   textSecondary,
   warmHaze,
 } from '../theme/colors';
+import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { cardShadow } from '../theme/shadows';
 
 type Me = {
@@ -82,7 +83,10 @@ export function EditProfileScreen({ navigation }: Props) {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: Math.max(insets.bottom, 24) }]}
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingBottom: Math.max(insets.bottom, 24), gap: FORM_SCROLL_GAP },
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -145,7 +149,7 @@ const styles = StyleSheet.create({
   topBar: { paddingHorizontal: 12, paddingBottom: 8 },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
   backText: { fontSize: 16, fontWeight: '600', color: lead },
-  scroll: { paddingHorizontal: 20, gap: 12 },
+  scroll: { paddingHorizontal: 20 },
   title: { fontSize: 26, fontWeight: '800', color: lead, letterSpacing: -0.4 },
   subtitle: { fontSize: 15, color: textSecondary, lineHeight: 22, fontWeight: '600' },
   card: {
@@ -155,7 +159,7 @@ const styles = StyleSheet.create({
     backgroundColor: cascadingWhite,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
-    gap: 10,
+    gap: 12,
   },
   sectionLabel: {
     fontSize: 13,
@@ -164,7 +168,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
-  hint: { fontSize: 13, color: warmHaze, lineHeight: 19, marginBottom: 4 },
+  hint: { fontSize: 13, color: warmHaze, lineHeight: 19, marginBottom: 8 },
   fieldLabel: { fontSize: 13, fontWeight: '700', color: lead },
   input: {
     backgroundColor: '#f3f3f5',
@@ -175,6 +179,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
     color: lead,
+    marginBottom: 2,
   },
   error: { color: '#b3261e', fontSize: 14 },
   saveBtn: {

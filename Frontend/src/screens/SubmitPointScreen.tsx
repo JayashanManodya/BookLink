@@ -27,6 +27,7 @@ import {
   textSecondary,
   warmHaze,
 } from '../theme/colors';
+import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { cardShadow } from '../theme/shadows';
 import type { CollectionPoint } from '../types/point';
 
@@ -185,7 +186,7 @@ export function SubmitPointScreen({ navigation, route }: Props) {
         </Pressable>
       </View>
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { gap: FORM_SCROLL_GAP }]}
         keyboardShouldPersistTaps="handled"
         nestedScrollEnabled
       >
@@ -245,13 +246,13 @@ function Field({
   multiline?: boolean;
 }) {
   return (
-    <View style={styles.fieldWrap}>
+    <View style={{ width: '100%', gap: 6 }}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
         value={value}
         onChangeText={onChange}
         placeholderTextColor={warmHaze}
-        style={[styles.input, multiline && { minHeight: 72, textAlignVertical: 'top' }]}
+        style={[styles.input, multiline && styles.inputMultiline]}
         multiline={multiline}
       />
     </View>
@@ -264,12 +265,11 @@ const styles = StyleSheet.create({
   topBar: { paddingHorizontal: 12, paddingBottom: 4 },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
   backText: { fontSize: 16, fontWeight: '600', color: lead },
-  scroll: { paddingHorizontal: 20, paddingBottom: 40, gap: 12, paddingTop: 8 },
+  scroll: { paddingHorizontal: 20, paddingBottom: 40, paddingTop: 8 },
   head: { fontSize: 22, fontWeight: '800', color: lead },
   mapSectionTitle: { fontSize: 17, fontWeight: '800', color: lead, marginTop: 4 },
   mapSectionSub: { fontSize: 14, color: textSecondary, lineHeight: 20 },
   detailsTitle: { fontSize: 15, fontWeight: '800', color: lead, marginTop: 8 },
-  fieldWrap: { width: '100%', gap: 6 },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
   input: {
     backgroundColor: '#f3f3f5',
@@ -281,6 +281,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: lead,
   },
+  inputMultiline: { minHeight: 72, textAlignVertical: 'top', marginBottom: 2 },
   submit: {
     marginTop: 8,
     backgroundColor: crunch,

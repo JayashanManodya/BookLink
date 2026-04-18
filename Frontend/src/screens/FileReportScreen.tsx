@@ -25,6 +25,7 @@ import {
   textSecondary,
   warmHaze,
 } from '../theme/colors';
+import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { cardShadow } from '../theme/shadows';
 import { REPORT_REASONS } from '../types/report';
 
@@ -119,7 +120,10 @@ export function FileReportScreen({ navigation, route }: Props) {
           <Text style={styles.backText}>Back</Text>
         </Pressable>
       </View>
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { gap: FORM_SCROLL_GAP }]}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={styles.head}>File a report</Text>
         {pre?.reportedLabel ? <Text style={styles.hint}>Regarding: {pre.reportedLabel}</Text> : null}
         <Text style={styles.label}>Reason</Text>
@@ -160,7 +164,7 @@ export function FileReportScreen({ navigation, route }: Props) {
           onChangeText={setDescription}
           placeholder="What happened?"
           placeholderTextColor={warmHaze}
-          style={[styles.input, { minHeight: 100, textAlignVertical: 'top' }]}
+          style={[styles.input, styles.inputMultiline]}
           multiline
         />
         <FormImageAttachment
@@ -185,7 +189,7 @@ const styles = StyleSheet.create({
   topBar: { paddingHorizontal: 12, paddingBottom: 4 },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
   backText: { fontSize: 16, fontWeight: '600', color: lead },
-  scroll: { paddingHorizontal: 20, paddingBottom: 40, gap: 10, paddingTop: 8 },
+  scroll: { paddingHorizontal: 20, paddingBottom: 40, paddingTop: 8 },
   head: { fontSize: 22, fontWeight: '800', color: lead },
   hint: { fontSize: 14, color: textSecondary },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
@@ -212,6 +216,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: lead,
   },
+  inputMultiline: { minHeight: 100, textAlignVertical: 'top', marginBottom: 2 },
   submit: {
     marginTop: 8,
     backgroundColor: crunch,

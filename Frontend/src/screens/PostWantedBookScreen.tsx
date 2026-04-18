@@ -17,6 +17,7 @@ import {
   textSecondary,
   warmHaze,
 } from '../theme/colors';
+import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { cardShadow } from '../theme/shadows';
 
 type Props = NativeStackScreenProps<WishlistStackParamList, 'PostWanted'>;
@@ -175,7 +176,10 @@ export function PostWantedBookScreen({ navigation, route }: Props) {
         <Text style={styles.screenTitle}>{isEdit ? 'Edit wanted' : 'Post wanted'}</Text>
         <View style={{ width: 72 }} />
       </View>
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { gap: FORM_SCROLL_GAP }]}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={styles.hint}>
           {isEdit
             ? 'Update the details of your wanted book.'
@@ -244,7 +248,7 @@ function Field({
   numberOfLines?: number;
 }) {
   return (
-    <View style={styles.fieldWrap}>
+    <View style={{ width: '100%', gap: 6 }}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
         value={value}
@@ -272,9 +276,8 @@ const styles = StyleSheet.create({
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, width: 88 },
   backText: { fontSize: 15, fontWeight: '600', color: lead },
   screenTitle: { fontSize: 17, fontWeight: '800', color: lead },
-  scroll: { paddingHorizontal: 20, gap: 12, paddingBottom: 40, paddingTop: 8 },
+  scroll: { paddingHorizontal: 20, paddingBottom: 40, paddingTop: 8 },
   hint: { fontSize: 14, color: textSecondary, lineHeight: 20 },
-  fieldWrap: { width: '100%', gap: 6 },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
   input: {
     backgroundColor: '#f3f3f5',
@@ -286,7 +289,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: lead,
   },
-  inputMultiline: { minHeight: 92, paddingTop: 12 },
+  inputMultiline: { minHeight: 92, paddingTop: 12, marginBottom: 2 },
+  row2: { flexDirection: 'row', gap: 10 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     paddingHorizontal: 14,

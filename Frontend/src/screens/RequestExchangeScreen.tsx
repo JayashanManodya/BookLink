@@ -28,6 +28,7 @@ import {
   textSecondary,
   warmHaze,
 } from '../theme/colors';
+import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { cardShadow } from '../theme/shadows';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'RequestExchange'>;
@@ -118,7 +119,10 @@ export function RequestExchangeScreen({ navigation, route }: Props) {
           <SignInWithGoogleButton />
         </ScrollView>
       ) : (
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 }]} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={[styles.scroll, { paddingBottom: 40, gap: FORM_SCROLL_GAP }]}
+          keyboardShouldPersistTaps="handled"
+        >
           <Text style={styles.head}>Request exchange</Text>
           <Text style={styles.bookTitle} numberOfLines={3}>
             For: {title}
@@ -157,7 +161,7 @@ const styles = StyleSheet.create({
   topBar: { paddingHorizontal: 12, paddingBottom: 4 },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
   backText: { fontSize: 16, fontWeight: '600', color: lead },
-  scroll: { paddingHorizontal: 20, gap: 12, paddingTop: 8 },
+  scroll: { paddingHorizontal: 20, paddingTop: 8 },
   gateScroll: { flexGrow: 1, paddingBottom: 32 },
   head: { fontSize: 22, fontWeight: '800', color: lead },
   bookTitle: { fontSize: 16, color: textSecondary, lineHeight: 22 },
@@ -171,6 +175,7 @@ const styles = StyleSheet.create({
     padding: 14,
     fontSize: 16,
     color: lead,
+    marginBottom: 2,
   },
   submit: {
     marginTop: 8,

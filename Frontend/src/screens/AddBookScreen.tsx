@@ -31,6 +31,7 @@ import {
   textSecondary,
   warmHaze,
 } from '../theme/colors';
+import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { cardShadow } from '../theme/shadows';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'AddBook'>;
@@ -199,7 +200,7 @@ export function AddBookScreen({ navigation }: Props) {
         <View style={{ width: 72 }} />
       </View>
       {!isSignedIn ? (
-        <ScrollView contentContainerStyle={[styles.scroll, styles.gateScroll]}>
+        <ScrollView contentContainerStyle={[styles.scroll, styles.gateScroll, { gap: 12 }]}>
           <SignInGateCard
             title="Sign in to list a book"
             message="Postings are tied to your account so readers know who listed each copy."
@@ -208,7 +209,10 @@ export function AddBookScreen({ navigation }: Props) {
           <SignInWithGoogleButton />
         </ScrollView>
       ) : (
-        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 }]} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={[styles.scroll, { paddingBottom: 40, gap: FORM_SCROLL_GAP }]}
+          keyboardShouldPersistTaps="handled"
+        >
           <FormImageAttachment
             previewUri={coverUri}
             onPick={pickCover}
@@ -263,7 +267,7 @@ export function AddBookScreen({ navigation }: Props) {
                 ))}
               </View>
             </View>
-            <View style={styles.rowFieldGrow}>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <Field label="Language" value={language} onChangeText={setLanguage} placeholder="Sinhala / Tamil / English" />
             </View>
           </View>
@@ -375,7 +379,7 @@ function Field({
   numberOfLines?: number;
 }) {
   return (
-    <View style={styles.fieldWrap}>
+    <View style={{ width: '100%', gap: 6 }}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
         value={value}
@@ -403,12 +407,10 @@ const styles = StyleSheet.create({
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, width: 88 },
   backText: { fontSize: 15, fontWeight: '600', color: lead },
   screenTitle: { fontSize: 17, fontWeight: '800', color: lead },
-  scroll: { paddingHorizontal: 20, gap: 12, paddingTop: 8 },
+  scroll: { paddingHorizontal: 20, paddingTop: 8 },
   gateScroll: { flexGrow: 1, paddingBottom: 32 },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
   hint: { fontSize: 13, color: textSecondary, lineHeight: 18, marginTop: 4 },
-  fieldWrap: { width: '100%', gap: 6 },
-  rowFieldGrow: { flex: 1, minWidth: 0 },
   input: {
     backgroundColor: '#f3f3f5',
     borderRadius: 14,
@@ -419,7 +421,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: lead,
   },
-  inputMultiline: { minHeight: 96, paddingTop: 12 },
+  inputMultiline: { minHeight: 96, paddingTop: 12, marginBottom: 2 },
   selectRow: {
     flexDirection: 'row',
     alignItems: 'center',
