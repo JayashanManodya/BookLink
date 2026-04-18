@@ -189,40 +189,6 @@ export function BookDetailScreen({ navigation, route }: Props) {
                 <Ionicons name="book-outline" size={52} color={cascadingWhite} />
               </View>
             )}
-            <View style={styles.heroOverlay}>
-              <View style={{ flex: 1, marginRight: 8 }}>
-                <Text style={styles.heroAuthor} numberOfLines={1}>
-                  {book.author}
-                </Text>
-                <Text style={styles.heroSub} numberOfLines={2}>
-                  <Ionicons name="location-outline" size={12} color="#d7e5f6" />{' '}
-                  {book.location || 'Location not specified'}
-                </Text>
-              </View>
-              <View style={styles.heroRatingCol}>
-                {book.ownerAvatarUrl ? (
-                  <Image source={{ uri: book.ownerAvatarUrl }} style={styles.heroListerPhoto} />
-                ) : (
-                  <View style={[styles.heroListerPhoto, styles.heroListerPhotoFallback]}>
-                    <Text style={styles.heroListerPhotoTxt}>{initialsFromName(ownerName)}</Text>
-                  </View>
-                )}
-                <Text style={styles.priceLabel}>Lister</Text>
-                <View style={styles.heroStarsRow}>
-                  <Ionicons name="star" size={14} color="#f4c025" />
-                  <Text style={styles.priceValue}>
-                    {ratingScore != null ? ratingScore.toFixed(1) : isSignedIn ? '—' : '·'}
-                  </Text>
-                </View>
-                {ratingCount > 0 ? (
-                  <Text style={styles.heroReviewCount}>{ratingCount} review{ratingCount === 1 ? '' : 's'}</Text>
-                ) : isSignedIn ? (
-                  <Text style={styles.heroReviewCount}>No reviews yet</Text>
-                ) : (
-                  <Text style={styles.heroReviewCount}>Sign in to view</Text>
-                )}
-              </View>
-            </View>
           </View>
 
           <View style={styles.titleBlock}>
@@ -387,39 +353,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(6, 27, 48, 0.58)',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  heroAuthor: { fontSize: 15, fontWeight: '800', color: cascadingWhite },
-  heroSub: { marginTop: 6, fontSize: 12, color: '#d7e5f6', lineHeight: 17 },
-  heroRatingCol: { alignItems: 'flex-end' },
-  heroListerPhoto: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    marginBottom: 8,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.92)',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  heroListerPhotoFallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroListerPhotoTxt: { fontSize: 18, fontWeight: '800', color: cascadingWhite },
-  heroStarsRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  priceLabel: { fontSize: 11, color: '#d7e5f6', fontWeight: '600', marginBottom: 2 },
-  priceValue: { fontSize: 20, fontWeight: '800', color: cascadingWhite },
-  heroReviewCount: { marginTop: 2, fontSize: 11, color: '#b8cce8', fontWeight: '600' },
   titleBlock: { marginTop: 4, gap: 4 },
   pageTitle: { fontSize: 24, fontWeight: '800', color: lead, letterSpacing: -0.4, lineHeight: 30 },
   pageAuthor: { fontSize: 16, fontWeight: '600', color: warmHaze },
