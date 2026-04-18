@@ -4,6 +4,7 @@ import { MyListingsScreen } from '../screens/MyListingsScreen';
 import { MyPointsScreen } from '../screens/MyPointsScreen';
 import { MyReviewsScreen } from '../screens/MyReviewsScreen';
 import { MyReportsScreen } from '../screens/MyReportsScreen';
+import { ListerReportsReceivedScreen } from '../screens/ListerReportsReceivedScreen';
 import { ReportExchangeScreen } from '../screens/ReportExchangeScreen';
 import { EditProfileScreen } from '../screens/EditProfileScreen';
 import { EditListingScreen } from '../screens/EditListingScreen';
@@ -27,6 +28,7 @@ export function ProfileStack() {
       <Stack.Screen name="UserReviews" component={UserReviewsScreen} />
       <Stack.Screen name="MyReviews" component={MyReviewsScreen} />
       <Stack.Screen name="MyReports" component={MyReportsScreen} />
+      <Stack.Screen name="ListerReportsReceived" component={ListerReportsReceivedScreen} />
       <Stack.Screen name="ReportExchange" component={ReportExchangeScreen} />
     </Stack.Navigator>
   );

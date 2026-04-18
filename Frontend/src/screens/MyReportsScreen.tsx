@@ -79,10 +79,9 @@ export function MyReportsScreen({ navigation }: Props) {
           <Text style={styles.backText}>Back</Text>
         </Pressable>
       </View>
-      <Text style={styles.title}>My exchange reports</Text>
+      <Text style={styles.title}>Reports I filed</Text>
       <Text style={styles.subtitle}>
-        Reports filed before you confirm receipt can be edited or deleted. After you confirm, they stay visible but are
-        read-only.
+        Editable only before you confirm receipt (if you report, you cannot confirm). After confirming, read-only.
       </Text>
       {loading ? (
         <ActivityIndicator style={{ marginTop: 24 }} color={crunch} />

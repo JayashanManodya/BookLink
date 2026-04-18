@@ -517,6 +517,15 @@ export async function confirmExchangeRequestReceipt(req, res, next) {
     if (row.requesterConfirmedAt) {
       return res.status(400).json({ error: 'You already confirmed this exchange' });
     }
+    const reportBlocksConfirm = await ExchangeReport.exists({
+      exchangeRequestId: row._id,
+      reporterClerkUserId: row.requesterClerkUserId,
+    });
+    if (reportBlocksConfirm) {
+      return res.status(400).json({
+        error: 'You cannot confirm receipt after filing a report for this exchange.',
+      });
+    }
     row.requesterConfirmedAt = new Date();
     await row.save();
 

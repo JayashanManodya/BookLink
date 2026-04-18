@@ -7,4 +7,7 @@ export type ReportExchangeParams = {
   reportId?: string;
   /** Lister viewing the reader's report (read-only). */
   listerView?: boolean;
+  /** Reader display name (e.g. from request card); API also returns profile. */
+  readerName?: string;
+  readerAvatarUrl?: string;
 };

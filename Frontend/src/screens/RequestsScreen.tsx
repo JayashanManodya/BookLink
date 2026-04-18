@@ -302,17 +302,35 @@ export function RequestsScreen({ navigation }: Props) {
                 {tab === 'sent' && r.status === 'accepted' ? (
                   <View style={styles.receiptPromptBlock}>
                     {!r.requesterConfirmedAt ? (
-                      <>
-                        <Text style={styles.confirmHint}>
-                          Confirm when you have the book, or report a problem first. After you confirm, you can only leave a
-                          review (no more reporting).
-                        </Text>
-                        <View style={styles.preConfirmRow}>
-                          <Pressable style={styles.confirmBtnHalf} onPress={() => confirmBookReceived(r._id)}>
-                            <Ionicons name="checkmark-circle-outline" size={17} color="#27500a" />
-                            <Text style={styles.confirmTxt}>Confirm receipt</Text>
+                      r.myExchangeReportId ? (
+                        <View style={styles.reportBlockedBlock}>
+                          <Text style={styles.reportBlockedTxt}>
+                            You filed a report for this swap. Receipt confirmation is not available.
+                          </Text>
+                          <Pressable
+                            style={styles.reportEditFullWidth}
+                            onPress={() =>
+                              navigation.navigate('ReportExchange', {
+                                exchangeRequestId: r._id,
+                                bookTitle: r.bookTitle || 'Book',
+                                reportId: r.myExchangeReportId,
+                              })
+                            }
+                          >
+                            <Text style={styles.reportEditTxt}>Your report</Text>
                           </Pressable>
-                          {!r.myExchangeReportId ? (
+                        </View>
+                      ) : (
+                        <>
+                          <Text style={styles.confirmHint}>
+                            Confirm when you have the book, or report a problem first. If you report, you cannot confirm
+                            receipt afterward.
+                          </Text>
+                          <View style={styles.preConfirmRow}>
+                            <Pressable style={styles.confirmBtnHalf} onPress={() => confirmBookReceived(r._id)}>
+                              <Ionicons name="checkmark-circle-outline" size={17} color="#27500a" />
+                              <Text style={styles.confirmTxt}>Confirm receipt</Text>
+                            </Pressable>
                             <Pressable
                               style={styles.reportBtnHalf}
                               onPress={() =>
@@ -325,22 +343,9 @@ export function RequestsScreen({ navigation }: Props) {
                               <Ionicons name="flag-outline" size={16} color="#8b2500" />
                               <Text style={styles.reportTxt}>Report</Text>
                             </Pressable>
-                          ) : (
-                            <Pressable
-                              style={styles.reportEditHalf}
-                              onPress={() =>
-                                navigation.navigate('ReportExchange', {
-                                  exchangeRequestId: r._id,
-                                  bookTitle: r.bookTitle || 'Book',
-                                  reportId: r.myExchangeReportId,
-                                })
-                              }
-                            >
-                              <Text style={styles.reportEditTxt}>Your report</Text>
-                            </Pressable>
-                          )}
-                        </View>
-                      </>
+                          </View>
+                        </>
+                      )
                     ) : (
                       <>
                         <Text style={styles.confirmedDone}>
@@ -405,6 +410,8 @@ export function RequestsScreen({ navigation }: Props) {
                             bookTitle: r.bookTitle || 'Book',
                             reportId: r.requesterReportId,
                             listerView: true,
+                            readerName: r.requesterDisplayName || 'Reader',
+                            readerAvatarUrl: r.requesterAvatarUrl || '',
                           })
                         }
                       >
@@ -661,9 +668,9 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#e8c4b8',
   },
-  reportEditHalf: {
-    flex: 1,
-    minWidth: '42%',
+  reportBlockedBlock: { gap: 10, marginTop: 2 },
+  reportBlockedTxt: { fontSize: 13, color: textSecondary, lineHeight: 18 },
+  reportEditFullWidth: {
     borderRadius: 14,
     paddingVertical: 12,
     alignItems: 'center',
@@ -671,6 +678,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f3f5',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
+    alignSelf: 'stretch',
   },
   reportEditTxt: { fontSize: 14, fontWeight: '800', color: lead },
   reportTxt: { fontSize: 14, fontWeight: '800', color: '#8b2500' },

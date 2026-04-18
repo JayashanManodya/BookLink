@@ -238,7 +238,11 @@ export function ProfileScreen() {
           <Text style={styles.chevron}>›</Text>
         </Pressable>
         <Pressable style={styles.menuRow} onPress={() => navigation.navigate('MyReports')}>
-          <Text style={styles.menuLabel}>Exchange reports</Text>
+          <Text style={styles.menuLabel}>Reports I filed</Text>
+          <Text style={styles.chevron}>›</Text>
+        </Pressable>
+        <Pressable style={styles.menuRow} onPress={() => navigation.navigate('ListerReportsReceived')}>
+          <Text style={styles.menuLabel}>Reports on my swaps</Text>
           <Text style={styles.chevron}>›</Text>
         </Pressable>
       </View>

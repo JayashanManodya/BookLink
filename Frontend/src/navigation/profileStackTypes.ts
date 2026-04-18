@@ -11,5 +11,7 @@ export type ProfileStackParamList = {
   UserReviews: UserReviewsParams;
   MyReviews: undefined;
   MyReports: undefined;
+  /** Reports readers filed on your accepted swaps (like a second inbox). */
+  ListerReportsReceived: undefined;
   ReportExchange: ReportExchangeParams;
 };

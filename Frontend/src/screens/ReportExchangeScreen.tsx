@@ -35,7 +35,7 @@ type Props = NativeStackScreenProps<RequestsStackParamList & ProfileStackParamLi
 
 export function ReportExchangeScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
-  const { exchangeRequestId, bookTitle, reportId, listerView } = route.params;
+  const { exchangeRequestId, bookTitle, reportId, listerView, readerName, readerAvatarUrl } = route.params;
   const isListerRoute = Boolean(listerView);
   const [details, setDetails] = useState('');
   const [existingEvidenceUrl, setExistingEvidenceUrl] = useState('');
@@ -48,6 +48,8 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
   const [readOnlyReason, setReadOnlyReason] = useState<ExchangeReport['readOnlyReason']>(
     isListerRoute ? 'lister_view' : null
   );
+  const [peerName, setPeerName] = useState(readerName ?? '');
+  const [peerAvatarUrl, setPeerAvatarUrl] = useState(readerAvatarUrl ?? '');
 
   const load = useCallback(async () => {
     if (!reportId) return;
@@ -57,6 +59,8 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
       const r = res.data.report;
       setDetails(r.details ?? '');
       setExistingEvidenceUrl(r.evidencePhoto ?? '');
+      if (r.reporterDisplayName) setPeerName(r.reporterDisplayName);
+      if (r.reporterAvatarUrl) setPeerAvatarUrl(r.reporterAvatarUrl);
       if (isListerRoute) {
         setCanEditReport(false);
         setReadOnlyReason('lister_view');
@@ -70,6 +74,26 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
       setLoading(false);
     }
   }, [reportId, navigation, isListerRoute]);
+
+  const openChatWithReader = () => {
+    const params = {
+      requestId: exchangeRequestId,
+      bookTitle: bookTitle || 'Book',
+      peerName: peerName || readerName || 'Reader',
+      peerAvatarUrl: peerAvatarUrl || readerAvatarUrl || '',
+    };
+    const stackNav = navigation.getParent();
+    const names = stackNav?.getState?.()?.routeNames as string[] | undefined;
+    if (names?.includes('RequestChat')) {
+      (stackNav as { navigate: (name: 'RequestChat', p: typeof params) => void }).navigate('RequestChat', params);
+      return;
+    }
+    const tabNav = stackNav?.getParent?.();
+    (tabNav as { navigate: (name: 'Requests', p: { screen: string; params: typeof params }) => void } | null)?.navigate(
+      'Requests',
+      { screen: 'RequestChat', params }
+    );
+  };
 
   useEffect(() => {
     void load();
@@ -138,7 +162,9 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
           details: details.trim(),
           evidencePhoto: evidenceUrl,
         });
-        alertOk('Sent', 'Thanks — we recorded your report.', () => navigation.goBack());
+        alertOk('Sent', 'We recorded your report. Receipt confirmation is not available for this swap.', () =>
+          navigation.goBack()
+        );
       }
     } catch (e: unknown) {
       alertOk('Error', apiErrorMessage(e, 'Could not save'));
@@ -160,21 +186,15 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
 
   const subHeadText = (() => {
     if (listerUi) {
-      return `For: ${bookTitle}. The reader filed this before confirming receipt. You can read it here; you cannot edit it.`;
+      return `For: ${bookTitle}`;
     }
     if (!reportId) {
-      return `For: ${bookTitle}. File this before you tap Confirm receipt on the request. After confirming, you can only leave a review.`;
+      return `For: ${bookTitle}. If you submit a report, you cannot confirm receipt for this swap.`;
     }
     if (readOnly) {
-      return `For: ${bookTitle}. This report is read-only because you already confirmed receipt.`;
+      return `For: ${bookTitle}`;
     }
-    return `For: ${bookTitle}. Update your report before you confirm receipt. After confirming, only a review is allowed.`;
-  })();
-
-  const bannerText = (() => {
-    if (listerUi) return 'You are viewing what the reader reported. Editing is not available.';
-    if (readOnly) return 'Confirmed — editing this report is no longer available.';
-    return '';
+    return `For: ${bookTitle}`;
   })();
 
   return (
@@ -194,7 +214,12 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
         >
           <Text style={styles.head}>{titleText}</Text>
           <Text style={styles.subHead}>{subHeadText}</Text>
-          {readOnly && bannerText ? <Text style={styles.lockedBanner}>{bannerText}</Text> : null}
+          {listerUi ? (
+            <Pressable style={styles.chatWithReaderBtn} onPress={openChatWithReader}>
+              <Ionicons name="chatbubbles-outline" size={20} color={lead} />
+              <Text style={styles.chatWithReaderTxt}>Chat with reader</Text>
+            </Pressable>
+          ) : null}
           <Text style={styles.label}>What happened?</Text>
           {readOnly ? (
             <Text style={styles.readOnlyDetails}>{details || '—'}</Text>
@@ -251,15 +276,6 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 20, paddingBottom: 40, paddingTop: 8 },
   head: { fontSize: 22, fontWeight: '800', color: lead },
   subHead: { fontSize: 14, color: textSecondary, lineHeight: 20, marginTop: 4 },
-  lockedBanner: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#854f0b',
-    backgroundColor: '#faeeda',
-    padding: 12,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
   readOnlyDetails: {
     fontSize: 16,
     color: lead,
@@ -298,4 +314,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   submitTxt: { fontSize: 16, fontWeight: '800', color: lead },
+  chatWithReaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    backgroundColor: '#f3f3f5',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+    alignSelf: 'stretch',
+  },
+  chatWithReaderTxt: { fontSize: 16, fontWeight: '800', color: lead },
 });

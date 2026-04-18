@@ -1,7 +1,61 @@
 import mongoose from 'mongoose';
+import { clerkClient } from '@clerk/express';
 import { Book } from '../models/Book.js';
 import { ExchangeRequest } from '../models/ExchangeRequest.js';
 import { ExchangeReport } from '../models/ExchangeReport.js';
+
+async function displayNameByUserIds(userIds) {
+  const ids = [...new Set(userIds.filter(Boolean))];
+  const entries = await Promise.all(
+    ids.map(async (id) => {
+      try {
+        const user = await clerkClient.users.getUser(id);
+        const first = user.firstName?.trim() || 'Reader';
+        const last = user.lastName?.trim();
+        const name = last ? `${first} ${last.charAt(0)}.` : first;
+        return [id, name];
+      } catch {
+        return [id, 'Reader'];
+      }
+    })
+  );
+  return Object.fromEntries(entries);
+}
+
+/** Display name + avatar for reporter (chat / lister view). */
+async function reporterProfilesByIds(userIds) {
+  const ids = [...new Set(userIds.filter(Boolean))];
+  const entries = await Promise.all(
+    ids.map(async (id) => {
+      try {
+        const user = await clerkClient.users.getUser(id);
+        const first = user.firstName?.trim() || 'Reader';
+        const last = user.lastName?.trim();
+        const displayName = last ? `${first} ${last.charAt(0)}.` : first;
+        return [id, { displayName, imageUrl: user.imageUrl || '' }];
+      } catch {
+        return [id, { displayName: 'Reader', imageUrl: '' }];
+      }
+    })
+  );
+  return Object.fromEntries(entries);
+}
+
+function serializeListerReceivedReport(doc, bookTitle, reporterDisplayName) {
+  const o = doc && typeof doc.toObject === 'function' ? doc.toObject() : doc;
+  return {
+    _id: String(o._id),
+    exchangeRequestId: String(o.exchangeRequestId),
+    reporterClerkUserId: o.reporterClerkUserId,
+    reporterDisplayName: reporterDisplayName || 'Reader',
+    bookTitle: bookTitle || '',
+    details: o.details ?? '',
+    evidencePhoto: o.evidencePhoto ?? '',
+    status: o.status ?? 'open',
+    createdAt: o.createdAt,
+    updatedAt: o.updatedAt,
+  };
+}
 
 function serializeReport(doc, extra = {}) {
   const o = doc.toObject ? doc.toObject() : doc;
@@ -11,6 +65,9 @@ function serializeReport(doc, extra = {}) {
     extra.readOnlyReason === 'reporter_locked' || extra.readOnlyReason === 'lister_view'
       ? extra.readOnlyReason
       : null;
+  const reporterDisplayName =
+    typeof extra.reporterDisplayName === 'string' ? extra.reporterDisplayName : undefined;
+  const reporterAvatarUrl = typeof extra.reporterAvatarUrl === 'string' ? extra.reporterAvatarUrl : undefined;
   return {
     _id: String(o._id),
     exchangeRequestId: String(o.exchangeRequestId),
@@ -21,6 +78,8 @@ function serializeReport(doc, extra = {}) {
     bookTitle: typeof extra.bookTitle === 'string' ? extra.bookTitle : '',
     canEdit,
     readOnlyReason,
+    ...(reporterDisplayName != null ? { reporterDisplayName } : {}),
+    ...(reporterAvatarUrl != null ? { reporterAvatarUrl } : {}),
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,
   };
@@ -90,6 +149,38 @@ export async function createExchangeReport(req, res, next) {
   }
 }
 
+/** Reports filed by readers on exchanges where the current user is the lister (book owner). */
+export async function listReportsReceivedAsLister(req, res, next) {
+  try {
+    const me = req.clerkUserId;
+    const myExchangeIds = await ExchangeRequest.find({ ownerClerkUserId: me }).distinct('_id');
+    if (!myExchangeIds.length) {
+      return res.json({ reports: [] });
+    }
+    const rows = await ExchangeReport.find({ exchangeRequestId: { $in: myExchangeIds } })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+    const exIds = rows.map((r) => r.exchangeRequestId);
+    const exchanges = await ExchangeRequest.find({ _id: { $in: exIds } }).lean();
+    const byEx = Object.fromEntries(exchanges.map((e) => [String(e._id), e]));
+    const bookIds = [...new Set(exchanges.map((e) => String(e.bookId)))];
+    const books = await Book.find({ _id: { $in: bookIds } }).lean();
+    const byBook = Object.fromEntries(books.map((b) => [String(b._id), b]));
+    const reporterIds = rows.map((r) => r.reporterClerkUserId);
+    const nameById = await displayNameByUserIds(reporterIds);
+    const reports = rows.map((r) => {
+      const ex = byEx[String(r.exchangeRequestId)];
+      const book = ex ? byBook[String(ex.bookId)] : null;
+      const nm = nameById[r.reporterClerkUserId] || 'Reader';
+      return serializeListerReceivedReport(r, book?.title ?? '', nm);
+    });
+    return res.json({ reports });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 export async function listMyExchangeReports(req, res, next) {
   try {
     const me = req.clerkUserId;
@@ -145,8 +236,18 @@ export async function getExchangeReportById(req, res, next) {
       canEdit = false;
       readOnlyReason = 'lister_view';
     }
+    const repProf = (await reporterProfilesByIds([row.reporterClerkUserId]))[row.reporterClerkUserId] ?? {
+      displayName: 'Reader',
+      imageUrl: '',
+    };
     return res.json({
-      report: serializeReport(row, { bookTitle: book?.title ?? '', canEdit, readOnlyReason }),
+      report: serializeReport(row, {
+        bookTitle: book?.title ?? '',
+        canEdit,
+        readOnlyReason,
+        reporterDisplayName: repProf.displayName,
+        reporterAvatarUrl: repProf.imageUrl,
+      }),
     });
   } catch (err) {
     return next(err);
