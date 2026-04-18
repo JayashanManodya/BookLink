@@ -6,6 +6,11 @@ import { ExchangeReport } from '../models/ExchangeReport.js';
 function serializeReport(doc, extra = {}) {
   const o = doc.toObject ? doc.toObject() : doc;
   const canEdit = typeof extra.canEdit === 'boolean' ? extra.canEdit : true;
+  /** @type {'reporter_locked' | 'lister_view' | null} */
+  const readOnlyReason =
+    extra.readOnlyReason === 'reporter_locked' || extra.readOnlyReason === 'lister_view'
+      ? extra.readOnlyReason
+      : null;
   return {
     _id: String(o._id),
     exchangeRequestId: String(o.exchangeRequestId),
@@ -15,6 +20,7 @@ function serializeReport(doc, extra = {}) {
     status: o.status ?? 'open',
     bookTitle: typeof extra.bookTitle === 'string' ? extra.bookTitle : '',
     canEdit,
+    readOnlyReason,
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,
   };
@@ -77,7 +83,7 @@ export async function createExchangeReport(req, res, next) {
     }
     const book = await Book.findById(chk.row.bookId).lean();
     return res.status(201).json({
-      report: serializeReport(doc.toObject(), { bookTitle: book?.title ?? '', canEdit: true }),
+      report: serializeReport(doc.toObject(), { bookTitle: book?.title ?? '', canEdit: true, readOnlyReason: null }),
     });
   } catch (err) {
     return next(err);
@@ -98,7 +104,11 @@ export async function listMyExchangeReports(req, res, next) {
       const ex = byEx[String(r.exchangeRequestId)];
       const book = ex ? byBook[String(ex.bookId)] : null;
       const canEdit = canRequesterEditReport(ex);
-      return serializeReport(r, { bookTitle: book?.title ?? '', canEdit });
+      return serializeReport(r, {
+        bookTitle: book?.title ?? '',
+        canEdit,
+        readOnlyReason: canEdit ? null : 'reporter_locked',
+      });
     });
     return res.json({ reports });
   } catch (err) {
@@ -116,13 +126,28 @@ export async function getExchangeReportById(req, res, next) {
     if (!row) {
       return res.status(404).json({ error: 'Report not found' });
     }
-    if (row.reporterClerkUserId !== req.clerkUserId) {
+    const ex = await ExchangeRequest.findById(row.exchangeRequestId).lean();
+    if (!ex) {
+      return res.status(404).json({ error: 'Exchange request not found' });
+    }
+    const isReporter = row.reporterClerkUserId === req.clerkUserId;
+    const isLister = ex.ownerClerkUserId === req.clerkUserId;
+    if (!isReporter && !isLister) {
       return res.status(403).json({ error: 'Not allowed' });
     }
-    const ex = await ExchangeRequest.findById(row.exchangeRequestId).lean();
     const book = ex ? await Book.findById(ex.bookId).lean() : null;
-    const canEdit = canRequesterEditReport(ex);
-    return res.json({ report: serializeReport(row, { bookTitle: book?.title ?? '', canEdit }) });
+    let canEdit = false;
+    let readOnlyReason = null;
+    if (isReporter) {
+      canEdit = canRequesterEditReport(ex);
+      readOnlyReason = canEdit ? null : 'reporter_locked';
+    } else {
+      canEdit = false;
+      readOnlyReason = 'lister_view';
+    }
+    return res.json({
+      report: serializeReport(row, { bookTitle: book?.title ?? '', canEdit, readOnlyReason }),
+    });
   } catch (err) {
     return next(err);
   }
@@ -163,7 +188,11 @@ export async function updateExchangeReport(req, res, next) {
     const book = exAfter ? await Book.findById(exAfter.bookId).lean() : null;
     const canEdit = canRequesterEditReport(exAfter);
     return res.json({
-      report: serializeReport(row.toObject(), { bookTitle: book?.title ?? '', canEdit }),
+      report: serializeReport(row.toObject(), {
+        bookTitle: book?.title ?? '',
+        canEdit,
+        readOnlyReason: canEdit ? null : 'reporter_locked',
+      }),
     });
   } catch (err) {
     return next(err);

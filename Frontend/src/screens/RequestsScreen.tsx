@@ -390,10 +390,28 @@ export function RequestsScreen({ navigation }: Props) {
                 ) : null}
                 {tab === 'received' && r.status === 'accepted' && r.hasReportFromRequester ? (
                   <View style={styles.reportNotice}>
-                    <Ionicons name="alert-circle-outline" size={16} color="#8b2500" />
-                    <Text style={styles.reportNoticeTxt}>
-                      The requester reported an issue for this exchange.
-                    </Text>
+                    <View style={styles.reportNoticeTop}>
+                      <Ionicons name="alert-circle-outline" size={16} color="#8b2500" />
+                      <Text style={styles.reportNoticeTxt}>
+                        The requester reported an issue for this exchange.
+                      </Text>
+                    </View>
+                    {r.requesterReportId ? (
+                      <Pressable
+                        style={styles.viewReportBtn}
+                        onPress={() =>
+                          navigation.navigate('ReportExchange', {
+                            exchangeRequestId: r._id,
+                            bookTitle: r.bookTitle || 'Book',
+                            reportId: r.requesterReportId,
+                            listerView: true,
+                          })
+                        }
+                      >
+                        <Text style={styles.viewReportTxt}>View report</Text>
+                        <Ionicons name="chevron-forward" size={18} color="#8b2500" />
+                      </Pressable>
+                    ) : null}
                   </View>
                 ) : null}
                 <Pressable
@@ -658,9 +676,7 @@ const styles = StyleSheet.create({
   reportTxt: { fontSize: 14, fontWeight: '800', color: '#8b2500' },
   reportNotice: {
     marginTop: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    gap: 10,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -668,7 +684,22 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#e8c4b8',
   },
+  reportNoticeTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   reportNoticeTxt: { flex: 1, fontSize: 13, fontWeight: '700', color: '#8b2500' },
+  viewReportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    alignSelf: 'stretch',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: cascadingWhite,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e8c4b8',
+  },
+  viewReportTxt: { fontSize: 13, fontWeight: '800', color: '#8b2500' },
   reviewTxt: { fontSize: 14, fontWeight: '800', color: lead },
   reviewDone: {
     fontSize: 13,

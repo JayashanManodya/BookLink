@@ -35,15 +35,19 @@ type Props = NativeStackScreenProps<RequestsStackParamList & ProfileStackParamLi
 
 export function ReportExchangeScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
-  const { exchangeRequestId, bookTitle, reportId } = route.params;
+  const { exchangeRequestId, bookTitle, reportId, listerView } = route.params;
+  const isListerRoute = Boolean(listerView);
   const [details, setDetails] = useState('');
   const [existingEvidenceUrl, setExistingEvidenceUrl] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoMime, setPhotoMime] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(Boolean(reportId));
-  /** False after you confirm receipt — report is view-only. */
-  const [canEditReport, setCanEditReport] = useState(true);
+  /** False after you confirm receipt — report is view-only. Lister always view-only. */
+  const [canEditReport, setCanEditReport] = useState(!isListerRoute);
+  const [readOnlyReason, setReadOnlyReason] = useState<ExchangeReport['readOnlyReason']>(
+    isListerRoute ? 'lister_view' : null
+  );
 
   const load = useCallback(async () => {
     if (!reportId) return;
@@ -53,13 +57,19 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
       const r = res.data.report;
       setDetails(r.details ?? '');
       setExistingEvidenceUrl(r.evidencePhoto ?? '');
-      setCanEditReport(r.canEdit !== false);
+      if (isListerRoute) {
+        setCanEditReport(false);
+        setReadOnlyReason('lister_view');
+      } else {
+        setCanEditReport(r.canEdit !== false);
+        setReadOnlyReason(r.readOnlyReason ?? (r.canEdit === false ? 'reporter_locked' : null));
+      }
     } catch (e: unknown) {
       alertOk('Error', apiErrorMessage(e, 'Could not load report'), () => navigation.goBack());
     } finally {
       setLoading(false);
     }
-  }, [reportId, navigation]);
+  }, [reportId, navigation, isListerRoute]);
 
   useEffect(() => {
     void load();
@@ -105,7 +115,7 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
   };
 
   const submit = async () => {
-    if (!canEditReport) return;
+    if (!canEditReport || isListerRoute) return;
     let evidenceUrl = existingEvidenceUrl;
     if (photoUri) {
       evidenceUrl = await uploadEvidence();
@@ -138,7 +148,34 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
   };
 
   const previewUri = photoUri || existingEvidenceUrl || undefined;
-  const readOnly = Boolean(reportId) && !canEditReport;
+  const readOnly = isListerRoute || (Boolean(reportId) && !canEditReport);
+  const listerUi = isListerRoute || readOnlyReason === 'lister_view';
+
+  const titleText = (() => {
+    if (listerUi) return "Reader's report";
+    if (readOnly) return 'Your report';
+    if (reportId) return 'Edit report';
+    return 'Report an issue';
+  })();
+
+  const subHeadText = (() => {
+    if (listerUi) {
+      return `For: ${bookTitle}. The reader filed this before confirming receipt. You can read it here; you cannot edit it.`;
+    }
+    if (!reportId) {
+      return `For: ${bookTitle}. File this before you tap Confirm receipt on the request. After confirming, you can only leave a review.`;
+    }
+    if (readOnly) {
+      return `For: ${bookTitle}. This report is read-only because you already confirmed receipt.`;
+    }
+    return `For: ${bookTitle}. Update your report before you confirm receipt. After confirming, only a review is allowed.`;
+  })();
+
+  const bannerText = (() => {
+    if (listerUi) return 'You are viewing what the reader reported. Editing is not available.';
+    if (readOnly) return 'Confirmed — editing this report is no longer available.';
+    return '';
+  })();
 
   return (
     <View style={styles.flex}>
@@ -155,20 +192,9 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
           contentContainerStyle={[styles.scroll, { gap: FORM_SCROLL_GAP }]}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.head}>
-            {readOnly ? 'Your report' : reportId ? 'Edit report' : 'Report an issue'}
-          </Text>
-          <Text style={styles.subHead}>
-            For: {bookTitle}.{' '}
-            {reportId
-              ? readOnly
-                ? 'This report is read-only because you already confirmed receipt.'
-                : 'Update your report before you confirm receipt. After confirming, only a review is allowed.'
-              : 'File this before you tap Confirm receipt on the request. After confirming, you can only leave a review.'}
-          </Text>
-          {readOnly ? (
-            <Text style={styles.lockedBanner}>Confirmed — editing this report is no longer available.</Text>
-          ) : null}
+          <Text style={styles.head}>{titleText}</Text>
+          <Text style={styles.subHead}>{subHeadText}</Text>
+          {readOnly && bannerText ? <Text style={styles.lockedBanner}>{bannerText}</Text> : null}
           <Text style={styles.label}>What happened?</Text>
           {readOnly ? (
             <Text style={styles.readOnlyDetails}>{details || '—'}</Text>

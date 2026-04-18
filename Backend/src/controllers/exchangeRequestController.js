@@ -76,6 +76,8 @@ function serializeRequest(doc, bookLean, profileById = {}, extra = {}) {
     myExchangeReportId: extra.myExchangeReportId != null ? String(extra.myExchangeReportId) : null,
     /** For lister view: requester filed a report for this accepted swap. */
     hasReportFromRequester: Boolean(extra.hasReportFromRequester),
+    /** Report document id (for lister to open reader's report). */
+    requesterReportId: extra.requesterReportId != null ? String(extra.requesterReportId) : null,
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,
   };
@@ -125,17 +127,19 @@ export async function getExchangeRequestById(req, res, next) {
     })
       .select('_id')
       .lean();
-    const requesterReportExists = Boolean(
-      await ExchangeReport.exists({
-        exchangeRequestId: chk.row._id,
-        reporterClerkUserId: chk.row.requesterClerkUserId,
-      })
-    );
+    const requesterReportRow = await ExchangeReport.findOne({
+      exchangeRequestId: chk.row._id,
+      reporterClerkUserId: chk.row.requesterClerkUserId,
+    })
+      .select('_id')
+      .lean();
+    const requesterReportExists = Boolean(requesterReportRow);
     return res.json({
       request: serializeRequest(chk.row, book, userProfiles, {
         hasExchangeReview,
         myExchangeReportId: myReport?._id ?? null,
         hasReportFromRequester: requesterReportExists,
+        requesterReportId: requesterReportRow?._id ?? null,
       }),
     });
   } catch (err) {
@@ -171,22 +175,24 @@ export async function listExchangeRequests(req, res, next) {
       myReportRows.map((rep) => [String(rep.exchangeRequestId), String(rep._id)])
     );
     const requesterReportRows = await ExchangeReport.find({ exchangeRequestId: { $in: rowIds } })
-      .select('exchangeRequestId reporterClerkUserId')
+      .select('exchangeRequestId reporterClerkUserId _id')
       .lean();
     const rowById = Object.fromEntries(rows.map((r) => [String(r._id), r]));
-    const requesterReportExchangeIds = new Set(
-      requesterReportRows
-        .filter((rep) => {
-          const ex = rowById[String(rep.exchangeRequestId)];
-          return ex && rep.reporterClerkUserId === ex.requesterClerkUserId;
-        })
-        .map((rep) => String(rep.exchangeRequestId))
-    );
+    const requesterReportExchangeIds = new Set();
+    const requesterReportIdByExchangeId = {};
+    for (const rep of requesterReportRows) {
+      const ex = rowById[String(rep.exchangeRequestId)];
+      if (ex && rep.reporterClerkUserId === ex.requesterClerkUserId) {
+        requesterReportExchangeIds.add(String(rep.exchangeRequestId));
+        requesterReportIdByExchangeId[String(rep.exchangeRequestId)] = String(rep._id);
+      }
+    }
     const requests = rows.map((r) =>
       serializeRequest(r, byId[String(r.bookId)], userProfiles, {
         hasExchangeReview: reviewedIds.has(String(r._id)),
         myExchangeReportId: myReportIdByExchangeId[String(r._id)] ?? null,
         hasReportFromRequester: requesterReportExchangeIds.has(String(r._id)),
+        requesterReportId: requesterReportIdByExchangeId[String(r._id)] ?? null,
       })
     );
     return res.json({ requests });
@@ -523,17 +529,18 @@ export async function confirmExchangeRequestReceipt(req, res, next) {
     })
       .select('_id')
       .lean();
-    const requesterReportExists = Boolean(
-      await ExchangeReport.exists({
-        exchangeRequestId: row._id,
-        reporterClerkUserId: row.requesterClerkUserId,
-      })
-    );
+    const requesterReportRow = await ExchangeReport.findOne({
+      exchangeRequestId: row._id,
+      reporterClerkUserId: row.requesterClerkUserId,
+    })
+      .select('_id')
+      .lean();
     return res.json({
       request: serializeRequest(row.toObject(), book, userProfiles, {
         hasExchangeReview,
         myExchangeReportId: myReport?._id ?? null,
-        hasReportFromRequester: requesterReportExists,
+        hasReportFromRequester: Boolean(requesterReportRow),
+        requesterReportId: requesterReportRow?._id ?? null,
       }),
     });
   } catch (err) {

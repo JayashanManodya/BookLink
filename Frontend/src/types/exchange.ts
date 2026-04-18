@@ -25,6 +25,8 @@ export type ExchangeRequest = {
   myExchangeReportId?: string | null;
   /** For owner/lister cards: requester already filed a report for this exchange. */
   hasReportFromRequester?: boolean;
+  /** Report id when requester filed (so lister can open it). */
+  requesterReportId?: string | null;
   createdAt?: string;
   updatedAt?: string;
 };
