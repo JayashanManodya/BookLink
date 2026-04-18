@@ -13,6 +13,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FormImageAttachment } from '../components/FormImageAttachment';
 import { api, apiErrorMessage } from '../lib/api';
 import { alertOk } from '../lib/platformAlert';
 import type { ProfileStackParamList } from '../navigation/profileStackTypes';
@@ -51,6 +52,7 @@ export function FileReportScreen({ navigation, route }: Props) {
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
+      aspect: [3, 4],
       quality: 0.85,
     });
     if (!res.canceled && res.assets[0]) {
@@ -161,9 +163,15 @@ export function FileReportScreen({ navigation, route }: Props) {
           style={[styles.input, { minHeight: 100, textAlignVertical: 'top' }]}
           multiline
         />
-        <Pressable style={styles.pickBtn} onPress={() => void pick()}>
-          <Text style={styles.pickTxt}>{photoUri ? 'Change evidence photo' : 'Add evidence (optional)'}</Text>
-        </Pressable>
+        <FormImageAttachment
+          previewUri={photoUri}
+          onPick={pick}
+          onRemove={() => {
+            setPhotoUri(null);
+            setPhotoMime(null);
+          }}
+          emptyHint="Tap to add evidence photo (optional)"
+        />
         <Pressable style={[styles.submit, cardShadow]} onPress={() => void submit()} disabled={busy}>
           {busy ? <ActivityIndicator color={lead} /> : <Text style={styles.submitTxt}>Submit report</Text>}
         </Pressable>
@@ -204,14 +212,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: lead,
   },
-  pickBtn: {
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-  },
-  pickTxt: { fontSize: 14, fontWeight: '700', color: textSecondary },
   submit: {
     marginTop: 8,
     backgroundColor: crunch,

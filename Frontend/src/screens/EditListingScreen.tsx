@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Modal,
   Platform,
   Pressable,
@@ -15,6 +14,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FormImageAttachment } from '../components/FormImageAttachment';
 import { api } from '../lib/api';
 import { alertOk } from '../lib/platformAlert';
 import { BOOK_TYPES, type BookType } from '../constants/bookTypes';
@@ -205,10 +205,16 @@ export function EditListingScreen({ navigation, route }: Props) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Pressable style={[styles.upload, cardShadow]} onPress={() => void pickCover()}>
-          {coverPreview ? <Image source={{ uri: coverPreview }} style={styles.cover} /> : <Ionicons name="image-outline" size={36} color={warmHaze} />}
-          <Text style={styles.uploadHint}>{coverPreview ? 'Change cover photo' : 'Tap to add cover photo'}</Text>
-        </Pressable>
+        <FormImageAttachment
+          previewUri={coverPreview}
+          onPick={pickCover}
+          onRemove={() => {
+            setCoverUri(null);
+            setCoverMime(null);
+            setCoverPreview('');
+          }}
+          emptyHint="Tap to add cover photo"
+        />
 
         <Field label="Book title" value={title} onChangeText={setTitle} />
         <Field label="Author" value={author} onChangeText={setAuthor} />
@@ -386,18 +392,6 @@ const styles = StyleSheet.create({
   backText: { fontSize: 15, fontWeight: '600', color: lead },
   screenTitle: { fontSize: 18, fontWeight: '800', color: lead },
   scroll: { paddingHorizontal: 20, gap: 12, paddingBottom: 32, paddingTop: 8 },
-  upload: {
-    borderRadius: 20,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: dreamland,
-    paddingVertical: 18,
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#f8f8fa',
-  },
-  cover: { width: 110, height: 145, borderRadius: 10 },
-  uploadHint: { fontSize: 14, color: textSecondary, fontWeight: '600' },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
   input: {
     backgroundColor: '#f3f3f5',

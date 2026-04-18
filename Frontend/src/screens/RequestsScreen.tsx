@@ -20,6 +20,7 @@ import { api, apiErrorMessage } from '../lib/api';
 import { confirmDestructive } from '../lib/platformAlert';
 import { pickChatImageFromLibrary } from '../lib/pickChatImage';
 import { uploadChatImage } from '../lib/uploadChatImage';
+import { FormImageAttachment } from '../components/FormImageAttachment';
 import { SignInGateCard } from '../components/SignInGateCard';
 import type { RequestsStackParamList } from '../navigation/requestsStackTypes';
 import {
@@ -124,7 +125,7 @@ export function RequestsScreen({ navigation }: Props) {
   };
 
   const pickEditPhoto = async () => {
-    const picked = await pickChatImageFromLibrary();
+    const picked = await pickChatImageFromLibrary({ aspectBookCover: true });
     if (!picked) return;
     setEditPhotoLocalUri(picked.uri);
     setEditPhotoMime(picked.mimeType);
@@ -433,27 +434,12 @@ export function RequestsScreen({ navigation }: Props) {
                 numberOfLines={5}
               />
               <Text style={styles.modalFieldLabel}>Offered book photo</Text>
-              {editPhotoLocalUri || editPhotoUrl ? (
-                <View style={styles.editPhotoWrap}>
-                  <Image
-                    source={{ uri: editPhotoLocalUri || editPhotoUrl }}
-                    style={styles.editPhoto}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.editPhotoActions}>
-                    <Pressable style={styles.editPhotoBtn} onPress={() => void pickEditPhoto()}>
-                      <Text style={styles.editPhotoBtnTxt}>Change</Text>
-                    </Pressable>
-                    <Pressable style={styles.editPhotoBtnRemove} onPress={removeEditPhoto}>
-                      <Text style={styles.editPhotoBtnRemoveTxt}>Remove</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ) : (
-                <Pressable style={styles.pickBtn} onPress={() => void pickEditPhoto()}>
-                  <Text style={styles.pickTxt}>Add photo of book you offer (optional)</Text>
-                </Pressable>
-              )}
+              <FormImageAttachment
+                previewUri={editPhotoLocalUri || editPhotoUrl}
+                onPick={pickEditPhoto}
+                onRemove={removeEditPhoto}
+                emptyHint="Tap to add photo of book you offer (optional)"
+              />
             </ScrollView>
             <View style={styles.modalActionsRow}>
               <Pressable style={styles.modalBackBtn} onPress={closeEdit} disabled={editBusy}>
@@ -704,43 +690,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: lead,
   },
-  pickBtn: {
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-    marginBottom: 8,
-  },
-  pickTxt: { fontSize: 14, fontWeight: '700', color: textSecondary },
-  editPhotoWrap: { gap: 8, marginBottom: 8 },
-  editPhoto: {
-    width: '100%',
-    height: 160,
-    borderRadius: 12,
-    backgroundColor: chineseSilver,
-  },
-  editPhotoActions: { flexDirection: 'row', gap: 8 },
-  editPhotoBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-    backgroundColor: cascadingWhite,
-  },
-  editPhotoBtnTxt: { fontSize: 13, fontWeight: '800', color: lead },
-  editPhotoBtnRemove: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#e8bcbc',
-    backgroundColor: '#fdeaea',
-  },
-  editPhotoBtnRemoveTxt: { fontSize: 13, fontWeight: '800', color: '#7a2e2e' },
   modalActionsRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
   modalBackBtn: {
     flex: 1,

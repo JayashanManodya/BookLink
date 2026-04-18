@@ -16,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, apiErrorMessage } from '../lib/api';
+import { FormImageAttachment } from '../components/FormImageAttachment';
 import { SignInGateCard } from '../components/SignInGateCard';
 import { SignInWithGoogleButton } from '../components/SignInWithGoogleButton';
 import type { BrowseStackParamList } from '../navigation/browseStackTypes';
@@ -133,11 +134,15 @@ export function RequestExchangeScreen({ navigation, route }: Props) {
             textAlignVertical="top"
             numberOfLines={5}
           />
-          <Pressable style={styles.pickBtn} onPress={() => void pick()}>
-            <Text style={styles.pickTxt}>
-              {photoUri ? 'Change offered book photo' : 'Add photo of book you offer (optional)'}
-            </Text>
-          </Pressable>
+          <FormImageAttachment
+            previewUri={photoUri}
+            onPick={pick}
+            onRemove={() => {
+              setPhotoUri(null);
+              setPhotoMime(null);
+            }}
+            emptyHint="Tap to add photo of book you offer (optional)"
+          />
           <Pressable style={[styles.submit, cardShadow]} onPress={() => void submit()} disabled={busy}>
             {busy ? <ActivityIndicator color={lead} /> : <Text style={styles.submitTxt}>Send request</Text>}
           </Pressable>
@@ -167,14 +172,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: lead,
   },
-  pickBtn: {
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-  },
-  pickTxt: { fontSize: 14, fontWeight: '700', color: textSecondary },
   submit: {
     marginTop: 8,
     backgroundColor: crunch,

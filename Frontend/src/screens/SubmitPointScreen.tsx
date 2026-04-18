@@ -14,6 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CityDictionarySelect } from '../components/CityDictionarySelect';
+import { FormImageAttachment } from '../components/FormImageAttachment';
 import { LocationMapPicker } from '../components/LocationMapPicker';
 import { api, apiErrorMessage } from '../lib/api';
 import { alertOk } from '../lib/platformAlert';
@@ -92,6 +93,7 @@ export function SubmitPointScreen({ navigation, route }: Props) {
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
+      aspect: [3, 4],
       quality: 0.85,
     });
     if (!res.canceled && res.assets[0]) {
@@ -174,8 +176,6 @@ export function SubmitPointScreen({ navigation, route }: Props) {
     );
   }
 
-  const hasPhoto = Boolean(photoUri || existingPhotoUrl);
-
   return (
     <View style={styles.flex}>
       <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 8) }]}>
@@ -211,11 +211,16 @@ export function SubmitPointScreen({ navigation, route }: Props) {
         <Field label="Association (optional)" value={association} onChange={setAssociation} />
         <Field label="Hours (optional)" value={operatingHours} onChange={setOperatingHours} />
         <Field label="Contact (optional)" value={contactNumber} onChange={setContactNumber} />
-        <Pressable style={styles.pickBtn} onPress={() => void pick()}>
-          <Text style={styles.pickTxt}>
-            {hasPhoto ? 'Change photo' : 'Add location photo (optional)'}
-          </Text>
-        </Pressable>
+        <FormImageAttachment
+          previewUri={photoUri || existingPhotoUrl}
+          onPick={pick}
+          onRemove={() => {
+            setPhotoUri(null);
+            setPhotoMime(null);
+            setExistingPhotoUrl('');
+          }}
+          emptyHint="Tap to add location photo (optional)"
+        />
         <Pressable style={[styles.submit, cardShadow]} onPress={() => void submit()} disabled={busy}>
           {busy ? (
             <ActivityIndicator color={lead} />
@@ -275,14 +280,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: lead,
   },
-  pickBtn: {
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-  },
-  pickTxt: { fontSize: 14, fontWeight: '700', color: textSecondary },
   submit: {
     marginTop: 8,
     backgroundColor: crunch,

@@ -1,19 +1,10 @@
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FormImageAttachment } from '../components/FormImageAttachment';
 import { api, apiErrorMessage } from '../lib/api';
 import { alertOk } from '../lib/platformAlert';
 import type { WishlistStackParamList } from '../navigation/wishlistStackTypes';
@@ -158,8 +149,6 @@ export function PostWantedBookScreen({ navigation, route }: Props) {
     }
   };
 
-  const previewUri = photoUri || existingPhotoUrl;
-
   if (loadingEdit) {
     return (
       <View style={[styles.flex, { paddingTop: Math.max(insets.top, 8) }]}>
@@ -192,14 +181,16 @@ export function PostWantedBookScreen({ navigation, route }: Props) {
             ? 'Update the details of your wanted book.'
             : 'Tell the community what you need. Other readers may offer a swap.'}
         </Text>
-        <Pressable style={[styles.upload, cardShadow]} onPress={() => void pickPhoto()}>
-          {previewUri ? (
-            <Image source={{ uri: previewUri }} style={styles.preview} resizeMode="cover" />
-          ) : (
-            <Ionicons name="image-outline" size={34} color={warmHaze} />
-          )}
-          <Text style={styles.uploadHint}>{previewUri ? 'Change wanted photo' : 'Add wanted book photo'}</Text>
-        </Pressable>
+        <FormImageAttachment
+          previewUri={photoUri || existingPhotoUrl}
+          onPick={pickPhoto}
+          onRemove={() => {
+            setPhotoUri(null);
+            setPhotoMime(null);
+            setExistingPhotoUrl('');
+          }}
+          emptyHint="Tap to add wanted book photo"
+        />
         <Field label="Title" value={title} onChangeText={setTitle} placeholder="ICT Revision Guide 2024" />
         <Field label="Author (optional)" value={author} onChangeText={setAuthor} />
         <Field
@@ -283,18 +274,6 @@ const styles = StyleSheet.create({
   screenTitle: { fontSize: 17, fontWeight: '800', color: lead },
   scroll: { paddingHorizontal: 20, gap: 12, paddingBottom: 40, paddingTop: 8 },
   hint: { fontSize: 14, color: textSecondary, lineHeight: 20 },
-  upload: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: dreamland,
-    paddingVertical: 18,
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#f8f8fa',
-  },
-  preview: { width: 100, height: 130, borderRadius: 10 },
-  uploadHint: { fontSize: 13, color: textSecondary, fontWeight: '700' },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
   input: {
     backgroundColor: '#f3f3f5',
