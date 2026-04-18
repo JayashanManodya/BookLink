@@ -16,6 +16,15 @@ const wishlistThreadSchema = new mongoose.Schema(
       default: 'open',
       index: true,
     },
+    meetupCollectionPointId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'CollectionPoint',
+    },
+    meetupHandoffLabel: { type: String, trim: true, default: '' },
+    meetupLatitude: { type: Number },
+    meetupLongitude: { type: Number },
+    meetupScheduledAt: { type: Date },
+    meetupContactNumber: { type: String, trim: true, default: '' },
   },
   { timestamps: true }
 );

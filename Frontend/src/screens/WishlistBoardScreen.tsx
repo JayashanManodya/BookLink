@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -16,7 +15,6 @@ import { useAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, apiErrorMessage } from '../lib/api';
-import { confirmDestructive } from '../lib/platformAlert';
 import { SignInGateCard } from '../components/SignInGateCard';
 import type { WishlistStackParamList } from '../navigation/wishlistStackTypes';
 import {
@@ -42,7 +40,7 @@ function urgencyStyle(u: WishlistItem['urgency']) {
 export function WishlistBoardScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const route = useRoute<RouteProp<WishlistStackParamList, 'WishlistBoard'>>();
-  const { isSignedIn, userId } = useAuth();
+  const { isSignedIn } = useAuth();
   const [scope, setScope] = useState<'community' | 'mine'>(
     route.params?.initialTab === 'mine' ? 'mine' : 'community'
   );
@@ -84,23 +82,6 @@ export function WishlistBoardScreen({ navigation }: Props) {
       void fetchWishlist('screen');
     }, [isSignedIn, fetchWishlist])
   );
-
-  const confirmRemove = (w: WishlistItem) => {
-    const go = async () => {
-      try {
-        await api.delete(`/api/wishlist/${w._id}`);
-        setItems((prev) => prev.filter((x) => x._id !== w._id));
-      } catch (e: unknown) {
-        Alert.alert('Error', apiErrorMessage(e, 'Could not remove'));
-      }
-    };
-    confirmDestructive({
-      title: 'Remove wanted book?',
-      message: `"${w.title}" will no longer appear on the board.`,
-      confirmLabel: 'Remove',
-      onConfirm: () => void go(),
-    });
-  };
 
   if (!isSignedIn) {
     return (
@@ -188,45 +169,28 @@ export function WishlistBoardScreen({ navigation }: Props) {
           ) : (
             items.map((w) => {
               const u = urgencyStyle(w.urgency);
-              const canDelete = userId != null && w.ownerClerkUserId === userId;
               const detailLine = [w.author, w.subject].filter(Boolean).join(' · ');
               return (
-                <View
+                <Pressable
                   key={w._id}
                   style={[styles.wishCard, { backgroundColor: u.bg, borderColor: u.borderColor }]}
+                  onPress={() => navigation.navigate('WantedBookDetail', { wishlistItemId: w._id })}
                 >
-                  <View style={styles.wishCardInner}>
-                    <Pressable
-                      style={styles.wishCardMain}
-                      onPress={() => navigation.navigate('WantedBookDetail', { wishlistItemId: w._id })}
-                    >
-                      <View style={styles.wishTop}>
-                        <Text style={styles.wishName}>{w.title}</Text>
-                        <Text style={styles.urgency}>{w.urgency}</Text>
-                      </View>
-                      {detailLine ? <Text style={styles.wishDetail}>{detailLine}</Text> : null}
-                      {w.description ? (
-                        <Text style={styles.wishDesc} numberOfLines={2}>
-                          {w.description}
-                        </Text>
-                      ) : null}
-                      <Text style={styles.wishMeta}>
-                        {[w.language, scope === 'community' ? w.ownerDisplayName : null].filter(Boolean).join(' · ')}
-                      </Text>
-                      <Text style={styles.openHint}>Tap to open · chat if you have this book</Text>
-                    </Pressable>
-                    {canDelete ? (
-                      <Pressable
-                        onPress={() => confirmRemove(w)}
-                        hitSlop={8}
-                        style={styles.trashBtn}
-                        accessibilityLabel="Remove wanted book"
-                      >
-                        <Ionicons name="trash-outline" size={20} color={lead} />
-                      </Pressable>
-                    ) : null}
+                  <View style={styles.wishTop}>
+                    <Text style={styles.wishName}>{w.title}</Text>
+                    <Text style={styles.urgency}>{w.urgency}</Text>
                   </View>
-                </View>
+                  {detailLine ? <Text style={styles.wishDetail}>{detailLine}</Text> : null}
+                  {w.description ? (
+                    <Text style={styles.wishDesc} numberOfLines={2}>
+                      {w.description}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.wishMeta}>
+                    {[w.language, scope === 'community' ? w.ownerDisplayName : null].filter(Boolean).join(' · ')}
+                  </Text>
+                  <Text style={styles.openHint}>Tap to open · chat if you have this book</Text>
+                </Pressable>
               );
             })
           )}
@@ -305,10 +269,7 @@ const styles = StyleSheet.create({
     padding: 12,
     ...cardShadow,
   },
-  wishCardInner: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  wishCardMain: { flex: 1, paddingRight: 4 },
   wishTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
-  trashBtn: { padding: 8, marginTop: 2 },
   wishName: { flex: 1, fontSize: 17, fontWeight: '800', color: lead },
   urgency: {
     fontSize: 12,

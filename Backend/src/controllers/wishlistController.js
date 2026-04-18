@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { clerkClient } from '@clerk/express';
 import { Book } from '../models/Book.js';
+import { CollectionPoint } from '../models/CollectionPoint.js';
 import { WishlistItem } from '../models/WishlistItem.js';
 import { WishlistThread } from '../models/WishlistThread.js';
 import { WishlistThreadMessage } from '../models/WishlistThreadMessage.js';
@@ -51,6 +52,31 @@ async function getWishlistThreadForParticipant(threadId, me) {
     return { error: 'Not allowed to access this chat', status: 403 };
   }
   return { row };
+}
+
+function serializeWishlistThread(doc, itemLean, profileById = {}) {
+  const o = doc.toObject ? doc.toObject() : doc;
+  const seekerProfile = profileById[o.seekerClerkUserId] || {};
+  const helperProfile = profileById[o.helperClerkUserId] || {};
+  return {
+    _id: String(o._id),
+    wishlistItemId: String(o.wishlistItemId),
+    seekerClerkUserId: o.seekerClerkUserId,
+    helperClerkUserId: o.helperClerkUserId,
+    seekerDisplayName: seekerProfile.displayName || itemLean?.ownerDisplayName || 'Reader',
+    seekerAvatarUrl: seekerProfile.imageUrl || '',
+    helperDisplayName: helperProfile.displayName || 'Reader',
+    helperAvatarUrl: helperProfile.imageUrl || '',
+    itemTitle: itemLean?.title || 'Wanted book',
+    status: o.status,
+    meetupHandoffLabel: o.meetupHandoffLabel || '',
+    meetupLatitude: typeof o.meetupLatitude === 'number' ? o.meetupLatitude : null,
+    meetupLongitude: typeof o.meetupLongitude === 'number' ? o.meetupLongitude : null,
+    meetupScheduledAt: o.meetupScheduledAt ? new Date(o.meetupScheduledAt).toISOString() : null,
+    meetupContactNumber: o.meetupContactNumber || '',
+    createdAt: o.createdAt,
+    updatedAt: o.updatedAt,
+  };
 }
 
 function serializeThreadMessage(doc, profileById = {}) {
@@ -420,6 +446,103 @@ export async function listMyWishlistChats(req, res, next) {
     });
 
     return res.json({ chats });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+function parseMeetupAt(raw) {
+  if (raw == null) return { ok: false, error: 'meetupAt is required (ISO date-time)' };
+  const d = new Date(typeof raw === 'string' ? raw.trim() : raw);
+  if (Number.isNaN(d.getTime())) {
+    return { ok: false, error: 'meetupAt must be a valid date and time' };
+  }
+  return { ok: true, date: d };
+}
+
+function normalizeMeetupContact(raw) {
+  if (typeof raw !== 'string') return { ok: false, error: 'meetupContactNumber is required' };
+  const t = raw.trim().replace(/\s+/g, ' ');
+  if (t.length < 5 || t.length > 40) {
+    return { ok: false, error: 'meetupContactNumber must be 5\u201340 characters' };
+  }
+  return { ok: true, value: t };
+}
+
+export async function getWishlistThread(req, res, next) {
+  try {
+    const { threadId } = req.params;
+    const chk = await getWishlistThreadForParticipant(threadId, req.clerkUserId);
+    if (chk.error) {
+      return res.status(chk.status).json({ error: chk.error });
+    }
+    const item = await WishlistItem.findById(chk.row.wishlistItemId).lean();
+    const profiles = await getPublicProfilesById([chk.row.seekerClerkUserId, chk.row.helperClerkUserId]);
+    return res.json({ thread: serializeWishlistThread(chk.row, item, profiles) });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function setWishlistThreadMeetup(req, res, next) {
+  try {
+    const { threadId } = req.params;
+    const { collectionPointId, meetupAt, meetupContactNumber } = req.body ?? {};
+    if (!mongoose.isValidObjectId(threadId)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+    if (!collectionPointId || !mongoose.isValidObjectId(String(collectionPointId))) {
+      return res.status(400).json({ error: 'valid collectionPointId is required' });
+    }
+    const when = parseMeetupAt(meetupAt);
+    if (!when.ok) {
+      return res.status(400).json({ error: when.error });
+    }
+    const phone = normalizeMeetupContact(meetupContactNumber);
+    if (!phone.ok) {
+      return res.status(400).json({ error: phone.error });
+    }
+    const row = await WishlistThread.findById(threadId);
+    if (!row) {
+      return res.status(404).json({ error: 'Thread not found' });
+    }
+    if (row.helperClerkUserId !== req.clerkUserId) {
+      return res.status(403).json({ error: 'Only the helper (person offering the book) can set the meet-up' });
+    }
+    const point = await CollectionPoint.findById(collectionPointId).lean();
+    if (!point) {
+      return res.status(400).json({ error: 'Collection point not found' });
+    }
+    const meetupHandoffLabel = `${point.name} \u00B7 ${point.city}`;
+    row.meetupCollectionPointId = point._id;
+    row.meetupHandoffLabel = meetupHandoffLabel;
+    row.meetupLatitude = typeof point.latitude === 'number' ? point.latitude : undefined;
+    row.meetupLongitude = typeof point.longitude === 'number' ? point.longitude : undefined;
+    row.meetupScheduledAt = when.date;
+    row.meetupContactNumber = phone.value;
+    await row.save();
+
+    const senderDisplayName = await shortDisplayName(req.clerkUserId);
+    const whenStr = when.date.toLocaleString(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    const text = `Meet-up: ${meetupHandoffLabel}\nWhen: ${whenStr}\nContact: ${phone.value}`;
+    await WishlistThreadMessage.create({
+      threadId,
+      senderClerkUserId: req.clerkUserId,
+      senderDisplayName,
+      text: text.slice(0, 2000),
+      imageUrl: '',
+    });
+
+    const item = await WishlistItem.findById(row.wishlistItemId).lean();
+    const profiles = await getPublicProfilesById([row.seekerClerkUserId, row.helperClerkUserId]);
+    return res.json({ thread: serializeWishlistThread(row.toObject(), item, profiles) });
   } catch (err) {
     return next(err);
   }

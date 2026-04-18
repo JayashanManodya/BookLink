@@ -109,8 +109,24 @@ export function WantedBookDetailScreen({ navigation, route }: Props) {
     });
   };
 
-  const goListBook = () => {
-    navigation.getParent()?.navigate('Browse', { screen: 'AddBook' });
+  const confirmDelete = () => {
+    if (!item) return;
+    const itemId = item._id;
+    const title = item.title;
+    confirmDestructive({
+      title: 'Delete wanted book?',
+      message: `"${title}" will be removed from the community board along with any help chats.`,
+      confirmLabel: 'Delete',
+      onConfirm: () =>
+        void (async () => {
+          try {
+            await api.delete(`/api/wishlist/${itemId}`);
+            navigation.goBack();
+          } catch (e: unknown) {
+            Alert.alert('Error', apiErrorMessage(e, 'Could not delete'));
+          }
+        })(),
+    });
   };
 
   if (loading) {
@@ -185,12 +201,22 @@ export function WantedBookDetailScreen({ navigation, route }: Props) {
                   <Ionicons name="create-outline" size={16} color={lead} />
                   <Text style={styles.secondaryBtnTxt}>Edit</Text>
                 </Pressable>
+                <Pressable style={[styles.deleteBtn, cardShadow]} onPress={confirmDelete}>
+                  <Ionicons name="trash-outline" size={16} color="#7a2e2e" />
+                  <Text style={styles.deleteBtnTxt}>Delete</Text>
+                </Pressable>
                 <Pressable style={[styles.secondaryBtn, cardShadow]} onPress={() => markFulfilled()}>
                   <Text style={styles.secondaryBtnTxt}>Mark as fulfilled</Text>
                 </Pressable>
               </View>
             ) : (
-              <Text style={styles.closed}>This post is fulfilled.</Text>
+              <View style={styles.ownerActionsRow}>
+                <Text style={styles.closed}>This post is fulfilled.</Text>
+                <Pressable style={[styles.deleteBtn, cardShadow]} onPress={confirmDelete}>
+                  <Ionicons name="trash-outline" size={16} color="#7a2e2e" />
+                  <Text style={styles.deleteBtnTxt}>Delete</Text>
+                </Pressable>
+              </View>
             )}
             {threads.length === 0 ? (
               <Text style={styles.noThreads}>No messages yet.</Text>
@@ -226,11 +252,9 @@ export function WantedBookDetailScreen({ navigation, route }: Props) {
               {busy ? <ActivityIndicator color={lead} /> : <Text style={styles.primaryBtnTxt}>Message & offer this book</Text>}
             </Pressable>
             <Text style={styles.hint}>
-              Start a private chat with the person who wants it. You can coordinate a handoff or point them to your listing.
+              Start a private chat with the person who wants it. You can coordinate a handoff and set a meet-up right
+              from the chat.
             </Text>
-            <Pressable style={[styles.outlineBtn, cardShadow]} onPress={goListBook}>
-              <Text style={styles.outlineBtnTxt}>List a copy in Browse</Text>
-            </Pressable>
           </View>
         ) : null}
 
@@ -287,7 +311,19 @@ const styles = StyleSheet.create({
     borderColor: dreamland,
   },
   secondaryBtnTxt: { fontSize: 14, fontWeight: '800', color: lead },
-  closed: { fontSize: 14, color: warmHaze, fontWeight: '600' },
+  deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#fdeaea',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e8bcbc',
+  },
+  deleteBtnTxt: { fontSize: 14, fontWeight: '800', color: '#7a2e2e' },
+  closed: { fontSize: 14, color: warmHaze, fontWeight: '600', flex: 1 },
   noThreads: { fontSize: 14, color: warmHaze },
   threadRow: {
     flexDirection: 'row',
@@ -309,15 +345,6 @@ const styles = StyleSheet.create({
     borderColor: dreamland,
   },
   primaryBtnTxt: { fontSize: 16, fontWeight: '800', color: lead },
-  outlineBtn: {
-    borderRadius: 20,
-    paddingVertical: 14,
-    alignItems: 'center',
-    backgroundColor: cascadingWhite,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-  },
-  outlineBtnTxt: { fontSize: 15, fontWeight: '800', color: lead },
   hint: { fontSize: 13, color: textSecondary, lineHeight: 19 },
   error: { color: '#b3261e', padding: 20 },
 });
