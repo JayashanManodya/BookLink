@@ -33,8 +33,16 @@ function serializeReport(doc, extras = {}) {
 
 export async function submitReport(req, res, next) {
   try {
+    const reporterId = req.clerkUserId;
+    if (!reporterId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     const { reportedUserClerkId, reportedBookId, reason, description, evidencePhoto } = req.body ?? {};
-    const userId = typeof reportedUserClerkId === 'string' ? reportedUserClerkId.trim() : '';
+    const userId =
+      reportedUserClerkId == null || reportedUserClerkId === ''
+        ? ''
+        : String(reportedUserClerkId).trim();
     let bookId = null;
     if (reportedBookId != null && String(reportedBookId).trim()) {
       const sid = String(reportedBookId).trim();
@@ -46,26 +54,35 @@ export async function submitReport(req, res, next) {
     if (!userId && !bookId) {
       return res.status(400).json({ error: 'reportedUserClerkId or reportedBookId is required' });
     }
-    if (userId && userId === req.clerkUserId) {
+    if (userId && userId === reporterId) {
       return res.status(400).json({ error: 'You cannot report yourself' });
     }
-    if (!REPORT_REASONS.includes(reason)) {
+    const reasonStr = typeof reason === 'string' ? reason.trim() : '';
+    if (!REPORT_REASONS.includes(reasonStr)) {
       return res.status(400).json({ error: 'Invalid reason' });
     }
     if (!description || typeof description !== 'string' || !description.trim()) {
       return res.status(400).json({ error: 'description is required' });
     }
     const report = await Report.create({
-      reporterClerkUserId: req.clerkUserId,
+      reporterClerkUserId: reporterId,
       reportedUserClerkId: userId,
       reportedBookId: bookId,
-      reason,
+      reason: reasonStr,
       description: description.trim().slice(0, 8000),
-      evidencePhoto: typeof evidencePhoto === 'string' ? evidencePhoto.trim() : '',
+      evidencePhoto: typeof evidencePhoto === 'string' ? evidencePhoto.trim().slice(0, 4000) : '',
       status: 'Open',
     });
     return res.status(201).json({ report: serializeReport(report) });
   } catch (err) {
+    if (err?.name === 'ValidationError') {
+      const first = err.errors ? Object.values(err.errors)[0] : null;
+      const msg = first?.message || err.message || 'Invalid report data';
+      return res.status(400).json({ error: msg });
+    }
+    if (err?.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid report data' });
+    }
     return next(err);
   }
 }
