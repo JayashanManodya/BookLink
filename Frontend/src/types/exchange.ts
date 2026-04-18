@@ -23,6 +23,8 @@ export type ExchangeRequest = {
   hasExchangeReview?: boolean;
   /** Your report id for this exchange, if you filed one. */
   myExchangeReportId?: string | null;
+  /** For owner/lister cards: requester already filed a report for this exchange. */
+  hasReportFromRequester?: boolean;
   createdAt?: string;
   updatedAt?: string;
 };

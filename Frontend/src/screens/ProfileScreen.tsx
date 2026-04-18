@@ -45,6 +45,12 @@ type Stats = {
   wishlistOpen: number;
 };
 
+type RatingSummary = {
+  averageRating: number | null;
+  adjustedRating?: number | null;
+  reportsReceivedCount?: number;
+};
+
 export function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
@@ -54,6 +60,8 @@ export function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [avgRating, setAvgRating] = useState<number | null>(null);
+  const [adjustedRating, setAdjustedRating] = useState<number | null>(null);
+  const [reportsReceivedCount, setReportsReceivedCount] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -67,12 +75,18 @@ export function ProfileScreen() {
       setStats(statsRes.data);
       if (userId) {
         try {
-          const rev = await api.get<{ averageRating: number | null }>(
+          const rev = await api.get<RatingSummary>(
             `/api/reviews/user/${encodeURIComponent(userId)}`
           );
           setAvgRating(rev.data.averageRating);
+          setAdjustedRating(
+            typeof rev.data.adjustedRating === 'number' ? rev.data.adjustedRating : rev.data.averageRating
+          );
+          setReportsReceivedCount(rev.data.reportsReceivedCount ?? 0);
         } catch {
           setAvgRating(null);
+          setAdjustedRating(null);
+          setReportsReceivedCount(0);
         }
       }
     } catch (e: unknown) {
@@ -168,10 +182,13 @@ export function ProfileScreen() {
                 <Text style={styles.statValue}>{stats?.exchangesCompleted ?? 0}</Text>
               </View>
               <View style={[styles.statPill, { backgroundColor: '#fff3e0' }]}>
-                <Text style={styles.statLabel}>Rating</Text>
+                <Text style={styles.statLabel}>Trust score</Text>
                 <Text style={styles.statValue}>
-                  {avgRating != null ? `${avgRating} / 5` : '—'}
+                  {adjustedRating != null ? `${adjustedRating} / 5` : '—'}
                 </Text>
+                {avgRating != null && adjustedRating != null && avgRating !== adjustedRating ? (
+                  <Text style={styles.statHint}>{`Reviews: ${avgRating}/5 · Reports: ${reportsReceivedCount}`}</Text>
+                ) : null}
               </View>
             </View>
           </>
@@ -274,6 +291,7 @@ const styles = StyleSheet.create({
   },
   statLabel: { fontSize: 11, fontWeight: '600', color: warmHaze },
   statValue: { marginTop: 4, fontSize: 16, fontWeight: '800', color: lead },
+  statHint: { marginTop: 4, fontSize: 10, fontWeight: '600', color: warmHaze, textAlign: 'center' },
   menuCard: {
     backgroundColor: cascadingWhite,
     borderRadius: 24,

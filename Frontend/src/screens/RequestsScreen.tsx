@@ -388,6 +388,14 @@ export function RequestsScreen({ navigation }: Props) {
                     </View>
                   </View>
                 ) : null}
+                {tab === 'received' && r.status === 'accepted' && r.hasReportFromRequester ? (
+                  <View style={styles.reportNotice}>
+                    <Ionicons name="alert-circle-outline" size={16} color="#8b2500" />
+                    <Text style={styles.reportNoticeTxt}>
+                      The requester reported an issue for this exchange.
+                    </Text>
+                  </View>
+                ) : null}
                 <Pressable
                   style={styles.chatBtn}
                   onPress={() =>
@@ -648,6 +656,19 @@ const styles = StyleSheet.create({
   },
   reportEditTxt: { fontSize: 14, fontWeight: '800', color: lead },
   reportTxt: { fontSize: 14, fontWeight: '800', color: '#8b2500' },
+  reportNotice: {
+    marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#fff5f0',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#e8c4b8',
+  },
+  reportNoticeTxt: { flex: 1, fontSize: 13, fontWeight: '700', color: '#8b2500' },
   reviewTxt: { fontSize: 14, fontWeight: '800', color: lead },
   reviewDone: {
     fontSize: 13,

@@ -74,6 +74,8 @@ function serializeRequest(doc, bookLean, profileById = {}, extra = {}) {
     requesterConfirmedAt: o.requesterConfirmedAt ? new Date(o.requesterConfirmedAt).toISOString() : null,
     hasExchangeReview: Boolean(extra.hasExchangeReview),
     myExchangeReportId: extra.myExchangeReportId != null ? String(extra.myExchangeReportId) : null,
+    /** For lister view: requester filed a report for this accepted swap. */
+    hasReportFromRequester: Boolean(extra.hasReportFromRequester),
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,
   };
@@ -123,10 +125,17 @@ export async function getExchangeRequestById(req, res, next) {
     })
       .select('_id')
       .lean();
+    const requesterReportExists = Boolean(
+      await ExchangeReport.exists({
+        exchangeRequestId: chk.row._id,
+        reporterClerkUserId: chk.row.requesterClerkUserId,
+      })
+    );
     return res.json({
       request: serializeRequest(chk.row, book, userProfiles, {
         hasExchangeReview,
         myExchangeReportId: myReport?._id ?? null,
+        hasReportFromRequester: requesterReportExists,
       }),
     });
   } catch (err) {
@@ -161,10 +170,23 @@ export async function listExchangeRequests(req, res, next) {
     const myReportIdByExchangeId = Object.fromEntries(
       myReportRows.map((rep) => [String(rep.exchangeRequestId), String(rep._id)])
     );
+    const requesterReportRows = await ExchangeReport.find({ exchangeRequestId: { $in: rowIds } })
+      .select('exchangeRequestId reporterClerkUserId')
+      .lean();
+    const rowById = Object.fromEntries(rows.map((r) => [String(r._id), r]));
+    const requesterReportExchangeIds = new Set(
+      requesterReportRows
+        .filter((rep) => {
+          const ex = rowById[String(rep.exchangeRequestId)];
+          return ex && rep.reporterClerkUserId === ex.requesterClerkUserId;
+        })
+        .map((rep) => String(rep.exchangeRequestId))
+    );
     const requests = rows.map((r) =>
       serializeRequest(r, byId[String(r.bookId)], userProfiles, {
         hasExchangeReview: reviewedIds.has(String(r._id)),
         myExchangeReportId: myReportIdByExchangeId[String(r._id)] ?? null,
+        hasReportFromRequester: requesterReportExchangeIds.has(String(r._id)),
       })
     );
     return res.json({ requests });
@@ -501,10 +523,17 @@ export async function confirmExchangeRequestReceipt(req, res, next) {
     })
       .select('_id')
       .lean();
+    const requesterReportExists = Boolean(
+      await ExchangeReport.exists({
+        exchangeRequestId: row._id,
+        reporterClerkUserId: row.requesterClerkUserId,
+      })
+    );
     return res.json({
       request: serializeRequest(row.toObject(), book, userProfiles, {
         hasExchangeReview,
         myExchangeReportId: myReport?._id ?? null,
+        hasReportFromRequester: requesterReportExists,
       }),
     });
   } catch (err) {

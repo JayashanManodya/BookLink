@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { clerkClient } from '@clerk/express';
 import { Review } from '../models/Review.js';
 import { ExchangeRequest } from '../models/ExchangeRequest.js';
+import { ExchangeReport } from '../models/ExchangeReport.js';
 
 async function displayNameFor(clerkUserId) {
   try {
@@ -111,6 +112,24 @@ export async function getReviewsForUser(req, res, next) {
     ]);
     const averageRating = agg?.count ? Math.round(agg.averageRating * 10) / 10 : null;
     const reviewCount = agg?.count ?? 0;
+    const [reportsAgg] = await ExchangeReport.aggregate([
+      {
+        $lookup: {
+          from: 'exchangerequests',
+          localField: 'exchangeRequestId',
+          foreignField: '_id',
+          as: 'exchange',
+        },
+      },
+      { $unwind: '$exchange' },
+      { $match: { 'exchange.ownerClerkUserId': clerkUserId } },
+      { $group: { _id: null, count: { $sum: 1 } } },
+    ]);
+    const reportsReceivedCount = reportsAgg?.count ?? 0;
+    // Soft penalty to reflect repeated issues without wiping out review value.
+    const ratingPenalty = Math.min(2, reportsReceivedCount * 0.2);
+    const adjustedRating =
+      averageRating == null ? null : Math.max(1, Math.round((averageRating - ratingPenalty) * 10) / 10);
     const rows = await Review.find({ revieweeClerkUserId: clerkUserId, flagged: { $ne: true } })
       .sort({ createdAt: -1 })
       .limit(100)
@@ -118,7 +137,7 @@ export async function getReviewsForUser(req, res, next) {
     const ids = rows.flatMap((x) => [x.reviewerClerkUserId, x.revieweeClerkUserId]);
     const names = await namesForIds(ids);
     const reviews = rows.map((row) => serializeReview(row, names));
-    return res.json({ averageRating, reviewCount, reviews });
+    return res.json({ averageRating, adjustedRating, reportsReceivedCount, reviewCount, reviews });
   } catch (err) {
     return next(err);
   }
