@@ -9,7 +9,6 @@ import uploadRoutes from './routes/uploadRoutes.js';
 import wishlistRoutes from './routes/wishlistRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import pointRoutes from './routes/pointRoutes.js';
-import reportRoutes from './routes/reportRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 
 const app = express();
@@ -43,7 +42,6 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/points', pointRoutes);
-app.use('/api/reports', reportRoutes);
 app.use('/api/chats', chatRoutes);
 
 app.use((err, req, res, next) => {

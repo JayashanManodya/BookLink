@@ -62,18 +62,3 @@ export async function uploadLocationPhoto(req, res, next) {
     return next(err);
   }
 }
-
-export async function uploadReportEvidence(req, res, next) {
-  try {
-    if (!process.env.CLOUDINARY_CLOUD_NAME) {
-      return res.status(503).json({ error: 'Cloudinary is not configured' });
-    }
-    if (!req.file?.buffer) {
-      return res.status(400).json({ error: 'evidencePhoto file is required' });
-    }
-    const upload = await uploadBuffer(req.file.buffer, 'booklink/reports');
-    return res.json({ url: upload.secure_url, publicId: upload.public_id });
-  } catch (err) {
-    return next(err);
-  }
-}

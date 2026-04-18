@@ -10,11 +10,4 @@ export type ProfileStackParamList = {
   MyPoints: undefined;
   UserReviews: UserReviewsParams;
   MyReviews: undefined;
-  FileReport: {
-    reportedUserClerkId?: string;
-    reportedBookId?: string;
-    reportedLabel?: string;
-  };
-  MyReports: undefined;
-  ReportDetail: { reportId: string };
 };

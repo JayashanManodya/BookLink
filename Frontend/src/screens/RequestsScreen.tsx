@@ -99,7 +99,7 @@ export function RequestsScreen({ navigation }: Props) {
   const confirmBookReceived = (id: string) => {
     confirmDestructive({
       title: 'Confirm you received the book',
-      message: 'Mark this exchange as successfully received. After confirming, you won\u2019t be able to report this exchange.',
+      message: 'Mark this exchange as successfully received. After confirming, you won\u2019t be able to undo this.',
       cancelLabel: 'Not yet',
       confirmLabel: 'Yes, I got it',
       confirmStyle: 'default',
@@ -184,21 +184,6 @@ export function RequestsScreen({ navigation }: Props) {
       cancelLabel: 'No',
       confirmLabel: 'Cancel request',
       onConfirm: () => void updateStatus(id, 'cancelled'),
-    });
-  };
-
-  /** Opens Profile → File a report with this swap pre-filled (book + other participant). */
-  const openReportForExchange = (r: ExchangeRequest, role: 'sent' | 'received') => {
-    const reportedUserClerkId = role === 'sent' ? r.ownerClerkUserId : r.requesterClerkUserId;
-    const peerLabel = role === 'sent' ? r.ownerDisplayName || 'Lister' : r.requesterDisplayName || 'Reader';
-    const reportedLabel = `Exchange request · ${r.bookTitle || 'Book'} · ${peerLabel}`;
-    navigation.getParent()?.navigate('Profile', {
-      screen: 'FileReport',
-      params: {
-        reportedUserClerkId,
-        reportedBookId: r.bookId,
-        reportedLabel,
-      },
     });
   };
 
@@ -315,28 +300,16 @@ export function RequestsScreen({ navigation }: Props) {
                   <Image source={{ uri: r.offeredBookPhoto }} style={styles.offered} resizeMode="cover" />
                 ) : null}
                 {tab === 'sent' && r.status === 'accepted' ? (
-                  <View style={styles.reviewReportBlock}>
+                  <View style={styles.receiptPromptBlock}>
                     {!r.requesterConfirmedAt ? (
                       <>
                         <Text style={styles.confirmHint}>
-                          Did you receive the book in good condition? Confirm below, or report an issue before confirming.
+                          Did you receive the book in good condition? Confirm when you have the book.
                         </Text>
-                        <View style={styles.reviewReportRow}>
-                          <Pressable
-                            style={[styles.confirmBtn, styles.reviewReportHalf]}
-                            onPress={() => confirmBookReceived(r._id)}
-                          >
-                            <Ionicons name="checkmark-circle-outline" size={17} color="#27500a" />
-                            <Text style={styles.confirmTxt}>Confirm receipt</Text>
-                          </Pressable>
-                          <Pressable
-                            style={[styles.reportBtn, styles.reviewReportHalf]}
-                            onPress={() => openReportForExchange(r, 'sent')}
-                          >
-                            <Ionicons name="flag-outline" size={17} color={lead} />
-                            <Text style={styles.reportTxt}>Report</Text>
-                          </Pressable>
-                        </View>
+                        <Pressable style={styles.confirmBtnFull} onPress={() => confirmBookReceived(r._id)}>
+                          <Ionicons name="checkmark-circle-outline" size={17} color="#27500a" />
+                          <Text style={styles.confirmTxt}>Confirm receipt</Text>
+                        </Pressable>
                       </>
                     ) : (
                       <>
@@ -362,12 +335,6 @@ export function RequestsScreen({ navigation }: Props) {
                       </>
                     )}
                   </View>
-                ) : null}
-                {tab === 'received' && r.status === 'accepted' ? (
-                  <Pressable style={styles.reportBtnLister} onPress={() => openReportForExchange(r, 'received')}>
-                    <Ionicons name="flag-outline" size={17} color="#7a2e2e" />
-                    <Text style={styles.reportTxtLister}>Report an issue with this reader</Text>
-                  </Pressable>
                 ) : null}
                 {tab === 'received' && r.status === 'pending' ? (
                   <View style={styles.actions}>
@@ -600,9 +567,7 @@ const styles = StyleSheet.create({
   },
   chatTxt: { fontSize: 14, fontWeight: '700', color: lead },
   offered: { width: '100%', height: 140, borderRadius: 12, marginTop: 4, backgroundColor: chineseSilver },
-  reviewReportBlock: { marginTop: 4, gap: 6 },
-  reviewReportRow: { flexDirection: 'row', gap: 8, alignItems: 'stretch' },
-  reviewReportHalf: { flex: 1, marginTop: 0 },
+  receiptPromptBlock: { marginTop: 4, gap: 6 },
   reviewBtn: {
     borderRadius: 14,
     paddingVertical: 12,
@@ -613,33 +578,6 @@ const styles = StyleSheet.create({
     borderColor: dreamland,
   },
   reviewTxt: { fontSize: 14, fontWeight: '800', color: lead },
-  reportBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: 14,
-    paddingVertical: 12,
-    backgroundColor: cascadingWhite,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-  },
-  reportBtnFull: { flex: 1, alignSelf: 'stretch' },
-  reportTxt: { fontSize: 14, fontWeight: '800', color: lead },
-  reportBtnLister: {
-    marginTop: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderRadius: 14,
-    paddingVertical: 12,
-    backgroundColor: '#fdeaea',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#e8bcbc',
-  },
-  reportTxtLister: { fontSize: 14, fontWeight: '800', color: '#7a2e2e' },
   reviewDone: {
     fontSize: 13,
     fontWeight: '700',
@@ -657,6 +595,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#eaf3de',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#c0dd97',
+  },
+  confirmBtnFull: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 14,
+    paddingVertical: 12,
+    backgroundColor: '#eaf3de',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#c0dd97',
+    alignSelf: 'stretch',
   },
   confirmTxt: { fontSize: 14, fontWeight: '800', color: '#27500a' },
   confirmedDone: {

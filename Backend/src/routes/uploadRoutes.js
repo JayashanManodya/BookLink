@@ -1,11 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import {
-  uploadBookCover,
-  uploadEvidence,
-  uploadLocationPhoto,
-  uploadReportEvidence,
-} from '../controllers/uploadController.js';
+import { uploadBookCover, uploadEvidence, uploadLocationPhoto } from '../controllers/uploadController.js';
 import { requireClerkAuth } from '../middleware/requireClerkAuth.js';
 
 const router = Router();
@@ -24,6 +19,5 @@ const upload = multer({
 router.post('/image', requireClerkAuth, upload.single('image'), uploadBookCover);
 router.post('/evidence', requireClerkAuth, upload.single('evidencePhoto'), uploadEvidence);
 router.post('/location', requireClerkAuth, upload.single('locationPhoto'), uploadLocationPhoto);
-router.post('/report-evidence', requireClerkAuth, upload.single('evidencePhoto'), uploadReportEvidence);
 
 export default router;

@@ -220,14 +220,6 @@ export function ProfileScreen() {
           <Text style={styles.menuLabel}>Reviews I wrote</Text>
           <Text style={styles.chevron}>›</Text>
         </Pressable>
-        <Pressable style={styles.menuRow} onPress={() => navigation.navigate('MyReports')}>
-          <Text style={styles.menuLabel}>Reports filed</Text>
-          <Text style={styles.chevron}>›</Text>
-        </Pressable>
-        <Pressable style={styles.menuRow} onPress={() => navigation.navigate('FileReport', {})}>
-          <Text style={styles.menuLabel}>File a report</Text>
-          <Text style={styles.chevron}>›</Text>
-        </Pressable>
       </View>
 
       <Pressable onPress={() => signOut()} style={[styles.signOutBtn, cardShadow]}>
