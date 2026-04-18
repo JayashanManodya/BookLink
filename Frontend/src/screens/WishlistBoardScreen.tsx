@@ -110,7 +110,7 @@ export function WishlistBoardScreen({ navigation }: Props) {
     <View style={[styles.root, { paddingTop: Math.max(insets.top, 8) + 8 }]}>
       <View style={styles.headRow}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.title}>{scope === 'community' ? 'Wanted books' : 'My wishlist'}</Text>
+          <Text style={styles.title}>{scope === 'community' ? 'Wanted books' : 'My wanted books'}</Text>
           <Text style={styles.subtitle}>{subtitle}</Text>
         </View>
         <Pressable style={styles.chatsPill} onPress={() => navigation.navigate('WishlistChats')} hitSlop={6}>

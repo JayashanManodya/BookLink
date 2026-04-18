@@ -139,9 +139,6 @@ export function ProfileScreen() {
     >
       <View style={styles.headerRow}>
         <Text style={styles.headerTitle}>Profile</Text>
-        <Pressable style={styles.gear} onPress={() => void load()} hitSlop={8}>
-          <Text style={styles.gearText}>⚙</Text>
-        </Pressable>
       </View>
 
       <View style={[styles.identityCard, cardShadow]}>
@@ -201,7 +198,7 @@ export function ProfileScreen() {
             tabs?.navigate('Wishlist', { screen: 'WishlistBoard', params: { initialTab: 'mine' } })
           }
         >
-          <Text style={styles.menuLabel}>My wishlist</Text>
+          <Text style={styles.menuLabel}>My wanted books</Text>
           <Text style={styles.chevron}>{stats?.wishlistOpen ?? 0} open ›</Text>
         </Pressable>
         <Pressable style={styles.menuRow} onPress={() => navigation.navigate('BrowsePoints')}>
@@ -252,19 +249,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   headerTitle: { fontSize: 18, fontWeight: '800', color: lead },
-  gear: {
-    position: 'absolute',
-    right: 0,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-    backgroundColor: cascadingWhite,
-  },
-  gearText: { fontSize: 18, color: lead },
   identityCard: {
     backgroundColor: cascadingWhite,
     borderRadius: 24,
