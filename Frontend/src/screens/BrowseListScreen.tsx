@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Dimensions,
   Image,
   Modal,
@@ -60,11 +61,15 @@ const SEARCH_DEBOUNCE_MS = 380;
 const SCREEN_W = Dimensions.get('window').width;
 const WANTED_GRID_GAP = 12;
 const WANTED_CARD_W = (SCREEN_W - 40 - WANTED_GRID_GAP) / 2;
+const WANTED_PAGE_STRIDE = WANTED_CARD_W + WANTED_GRID_GAP;
 const CARD_W = Math.min(176, Math.max(152, SCREEN_W * 0.42));
+const POPULAR_CARD_GAP = 14;
+const POPULAR_PAGE_STRIDE = CARD_W + POPULAR_CARD_GAP;
 
 const LATEST_CARD_COUNT = 3;
 const LATEST_CARD_W = SCREEN_W - 40;
 const LATEST_CARD_GAP = 14;
+const LATEST_PAGE_STRIDE = LATEST_CARD_W + LATEST_CARD_GAP;
 
 function normalizeConditionLabel(value?: string) {
   const c = value.toLowerCase().trim();
@@ -126,6 +131,12 @@ export function BrowseListScreen({ navigation }: Props) {
   const [wantedItems, setWantedItems] = useState<WishlistItem[]>([]);
   const [wantedLoading, setWantedLoading] = useState(false);
   const [ownerReviewsById, setOwnerReviewsById] = useState<Record<string, OwnerReviewSummary>>({});
+  const latestScrollX = useRef(new Animated.Value(0)).current;
+  const latestCarouselRef = useRef<ScrollView>(null);
+  const popularScrollX = useRef(new Animated.Value(0)).current;
+  const popularCarouselRef = useRef<ScrollView>(null);
+  const wantedScrollX = useRef(new Animated.Value(0)).current;
+  const wantedCarouselRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
@@ -247,6 +258,66 @@ export function BrowseListScreen({ navigation }: Props) {
     if (loading || books.length === 0) return [] as Book[];
     return books.slice(0, Math.min(LATEST_CARD_COUNT, books.length));
   }, [loading, books]);
+
+  const latestBookIdsKey = useMemo(() => latestBooks.map((b) => b._id).join('|'), [latestBooks]);
+
+  useEffect(() => {
+    latestScrollX.setValue(0);
+    latestCarouselRef.current?.scrollTo({ x: 0, y: 0, animated: false });
+  }, [latestBookIdsKey, latestScrollX]);
+
+  const latestSnapOffsets = useMemo(
+    () => latestBooks.map((_, i) => i * LATEST_PAGE_STRIDE),
+    [latestBooks.length]
+  );
+
+  const latestScrollHandler = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { x: latestScrollX } } }], {
+        useNativeDriver: false,
+      }),
+    [latestScrollX]
+  );
+
+  const popularBookIdsKey = useMemo(() => books.map((b) => b._id).join('|'), [books]);
+
+  useEffect(() => {
+    popularScrollX.setValue(0);
+    popularCarouselRef.current?.scrollTo({ x: 0, y: 0, animated: false });
+  }, [popularBookIdsKey, popularScrollX]);
+
+  const popularSnapOffsets = useMemo(
+    () => books.map((_, i) => i * POPULAR_PAGE_STRIDE),
+    [popularBookIdsKey]
+  );
+
+  const popularScrollHandler = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { x: popularScrollX } } }], {
+        useNativeDriver: false,
+      }),
+    [popularScrollX]
+  );
+
+  const wantedBookIdsKey = useMemo(() => wantedItems.map((w) => w._id).join('|'), [wantedItems]);
+
+  useEffect(() => {
+    wantedScrollX.setValue(0);
+    wantedCarouselRef.current?.scrollTo({ x: 0, y: 0, animated: false });
+  }, [wantedBookIdsKey, wantedScrollX]);
+
+  const wantedSnapOffsets = useMemo(
+    () => wantedItems.map((_, i) => i * WANTED_PAGE_STRIDE),
+    [wantedBookIdsKey]
+  );
+
+  const wantedScrollHandler = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { x: wantedScrollX } } }], {
+        useNativeDriver: false,
+      }),
+    [wantedScrollX]
+  );
 
   const openWantedBoard = () => {
     navigation.getParent()?.navigate('Wishlist', {
@@ -412,7 +483,9 @@ export function BrowseListScreen({ navigation }: Props) {
 
         <View style={[styles.bodyPad, latestBooks.length === 0 && styles.bodyPadNoFeature]}>
           {latestBooks.length > 0 ? (
-            <ScrollView
+            <View style={styles.latestFeatureWrap}>
+              <Animated.ScrollView
+              ref={latestCarouselRef}
               horizontal
               nestedScrollEnabled
               showsHorizontalScrollIndicator={false}
@@ -421,6 +494,11 @@ export function BrowseListScreen({ navigation }: Props) {
               accessibilityLabel="Latest books, scroll sideways"
               contentContainerStyle={styles.latestCarouselContent}
               style={[styles.latestCarouselRow, styles.featureOverlap]}
+              snapToOffsets={latestSnapOffsets}
+              snapToEnd={false}
+              disableIntervalMomentum
+              scrollEventThrottle={16}
+              onScroll={latestScrollHandler}
             >
               {latestBooks.map((b) => (
                 <Pressable
@@ -477,7 +555,14 @@ export function BrowseListScreen({ navigation }: Props) {
                     </View>
                   </Pressable>
                 ))}
-            </ScrollView>
+            </Animated.ScrollView>
+              <CarouselPageDots
+                scrollX={latestScrollX}
+                pageCount={latestBooks.length}
+                stride={LATEST_PAGE_STRIDE}
+                carouselName="Latest books"
+              />
+            </View>
           ) : null}
 
           <View style={styles.sectionHeaderRow}>
@@ -515,13 +600,32 @@ export function BrowseListScreen({ navigation }: Props) {
             ))}
           </ScrollView>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.carouselContent}
-          >
-            {books.map((b) => renderPopularCard(b))}
-          </ScrollView>
+          <View>
+            <Animated.ScrollView
+              ref={popularCarouselRef}
+              horizontal
+              nestedScrollEnabled
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              decelerationRate="fast"
+              accessibilityLabel="Popular books, scroll sideways"
+              contentContainerStyle={styles.carouselContent}
+              style={styles.popularCarouselRow}
+              snapToOffsets={popularSnapOffsets}
+              snapToEnd={false}
+              disableIntervalMomentum
+              scrollEventThrottle={16}
+              onScroll={popularScrollHandler}
+            >
+              {books.map((b) => renderPopularCard(b))}
+            </Animated.ScrollView>
+            <CarouselPageDots
+              scrollX={popularScrollX}
+              pageCount={books.length}
+              stride={POPULAR_PAGE_STRIDE}
+              carouselName="Popular books"
+            />
+          </View>
 
           {hasAnyFilter ? (
             <Pressable onPress={clearAllFilters} style={styles.clearAllRow}>
@@ -558,54 +662,77 @@ export function BrowseListScreen({ navigation }: Props) {
               {wantedLoading && wantedItems.length === 0 ? (
                 <ActivityIndicator style={{ marginVertical: 14 }} color={themeGreen} />
               ) : (
-                <View style={styles.wantedGrid}>
-                  {wantedItems.map((w) => {
-                    const subjectLine = w.subject?.trim() || w.author?.trim() || 'Request';
-                    return (
-                      <Pressable
-                        key={w._id}
-                        onPress={() => openWantedDetail(w._id)}
-                        style={({ pressed }) => [
-                          styles.wantedCardOuter,
-                          cardShadow,
-                          pressed && styles.cardPressed,
-                        ]}
-                      >
-                        <View style={styles.wantedThumbWrap}>
-                          {w.wantedBookPhoto ? (
-                            <Image
-                              source={{ uri: w.wantedBookPhoto }}
-                              style={styles.wantedThumbImg as ImageStyle}
-                              resizeMode="cover"
-                            />
-                          ) : (
-                            <View style={styles.wantedThumbPh}>
-                              <Ionicons name="book-outline" size={36} color={themePrimary} />
-                            </View>
-                          )}
-                        </View>
-                        <View style={styles.wantedCardInner}>
-                          <Text style={[styles.wantedGridTitle, { fontFamily: font.bold }]} numberOfLines={2}>
-                            {w.title}
-                          </Text>
-                          <View style={styles.wantedMetaRow}>
-                            <View style={styles.wantedMetaLeft}>
-                              <Ionicons name="layers-outline" size={14} color={themeGreen} />
-                              <Text style={[styles.wantedMetaTxt, { fontFamily: font.medium }]} numberOfLines={1}>
-                                {subjectLine}
-                              </Text>
-                            </View>
-                            <View style={styles.wantedMetaRight}>
-                              <Ionicons name="time-outline" size={14} color={themePrimary} />
-                              <Text style={[styles.wantedMetaTime, { fontFamily: font.medium }]}>
-                                {relativeListingAge(w.createdAt)}
-                              </Text>
+                <View>
+                  <Animated.ScrollView
+                    ref={wantedCarouselRef}
+                    horizontal
+                    nestedScrollEnabled
+                    showsHorizontalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    decelerationRate="fast"
+                    accessibilityLabel="Wanted books, scroll sideways"
+                    contentContainerStyle={styles.wantedCarouselContent}
+                    style={styles.wantedCarouselRow}
+                    snapToOffsets={wantedSnapOffsets}
+                    snapToEnd={false}
+                    disableIntervalMomentum
+                    scrollEventThrottle={16}
+                    onScroll={wantedScrollHandler}
+                  >
+                    {wantedItems.map((w) => {
+                      const subjectLine = w.subject?.trim() || w.author?.trim() || 'Request';
+                      return (
+                        <Pressable
+                          key={w._id}
+                          onPress={() => openWantedDetail(w._id)}
+                          style={({ pressed }) => [
+                            styles.wantedCardOuter,
+                            cardShadow,
+                            pressed && styles.cardPressed,
+                          ]}
+                        >
+                          <View style={styles.wantedThumbWrap}>
+                            {w.wantedBookPhoto ? (
+                              <Image
+                                source={{ uri: w.wantedBookPhoto }}
+                                style={styles.wantedThumbImg as ImageStyle}
+                                resizeMode="cover"
+                              />
+                            ) : (
+                              <View style={styles.wantedThumbPh}>
+                                <Ionicons name="book-outline" size={36} color={themePrimary} />
+                              </View>
+                            )}
+                          </View>
+                          <View style={styles.wantedCardInner}>
+                            <Text style={[styles.wantedGridTitle, { fontFamily: font.bold }]} numberOfLines={2}>
+                              {w.title}
+                            </Text>
+                            <View style={styles.wantedMetaRow}>
+                              <View style={styles.wantedMetaLeft}>
+                                <Ionicons name="layers-outline" size={14} color={themeGreen} />
+                                <Text style={[styles.wantedMetaTxt, { fontFamily: font.medium }]} numberOfLines={1}>
+                                  {subjectLine}
+                                </Text>
+                              </View>
+                              <View style={styles.wantedMetaRight}>
+                                <Ionicons name="time-outline" size={14} color={themePrimary} />
+                                <Text style={[styles.wantedMetaTime, { fontFamily: font.medium }]}>
+                                  {relativeListingAge(w.createdAt)}
+                                </Text>
+                              </View>
                             </View>
                           </View>
-                        </View>
-                      </Pressable>
-                    );
-                  })}
+                        </Pressable>
+                      );
+                    })}
+                  </Animated.ScrollView>
+                  <CarouselPageDots
+                    scrollX={wantedScrollX}
+                    pageCount={wantedItems.length}
+                    stride={WANTED_PAGE_STRIDE}
+                    carouselName="Wanted books"
+                  />
                 </View>
               )}
             </View>
@@ -877,12 +1004,14 @@ const styles = StyleSheet.create({
     marginTop: -4,
     marginBottom: 4,
   },
-  wantedGrid: {
+  wantedCarouselRow: {
+    flexGrow: 0,
+  },
+  wantedCarouselContent: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    columnGap: WANTED_GRID_GAP,
-    rowGap: WANTED_GRID_GAP,
-    paddingTop: 4,
+    gap: WANTED_GRID_GAP,
+    paddingRight: 24,
+    paddingVertical: 4,
   },
   wantedCardOuter: {
     width: WANTED_CARD_W,
@@ -950,6 +1079,21 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: themeMuted,
   },
+  latestFeatureWrap: {
+    marginHorizontal: -20,
+  },
+  latestDotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingTop: 6,
+    paddingBottom: Platform.select({ ios: 2, default: 4 }),
+  },
+  latestDot: {
+    height: 8,
+    borderRadius: 4,
+  },
   featureOverlap: {
     marginTop: -FEATURE_OVERLAP_UP + GAP_SEARCH_TO_FEATURE_CARD,
     zIndex: 4,
@@ -957,7 +1101,6 @@ const styles = StyleSheet.create({
   },
   latestCarouselRow: {
     flexGrow: 0,
-    marginHorizontal: -20,
   },
   latestCarouselContent: {
     flexDirection: 'row',
@@ -1069,9 +1212,12 @@ const styles = StyleSheet.create({
   viewAllTxt: { fontSize: 14, color: themePrimary },
   carouselContent: {
     flexDirection: 'row',
-    gap: 14,
+    gap: POPULAR_CARD_GAP,
     paddingRight: 24,
     paddingVertical: 4,
+  },
+  popularCarouselRow: {
+    flexGrow: 0,
   },
   popCard: {
     width: CARD_W,
@@ -1323,3 +1469,55 @@ const styles = StyleSheet.create({
     color: cascadingWhite,
   },
 });
+
+function CarouselPageDots({
+  scrollX,
+  pageCount,
+  stride,
+  carouselName = 'Carousel',
+}: {
+  scrollX: Animated.Value;
+  pageCount: number;
+  stride: number;
+  carouselName?: string;
+}) {
+  if (pageCount <= 0) return null;
+  if (pageCount === 1) {
+    return (
+      <View style={styles.latestDotsRow} accessibilityRole="tablist">
+        <View
+          style={[styles.latestDot, { width: 22, backgroundColor: themePrimary, opacity: 1 }]}
+          accessibilityRole="tab"
+          accessibilityLabel={`${carouselName}, slide 1, current`}
+        />
+      </View>
+    );
+  }
+  return (
+    <View style={styles.latestDotsRow} accessibilityRole="tablist">
+      {Array.from({ length: pageCount }).map((_, index) => (
+        <Animated.View
+          key={index}
+          accessibilityRole="tab"
+          accessibilityLabel={`${carouselName}, slide ${index + 1}`}
+          style={[
+            styles.latestDot,
+            {
+              backgroundColor: themePrimary,
+              width: scrollX.interpolate({
+                inputRange: [(index - 0.5) * stride, index * stride, (index + 0.5) * stride],
+                outputRange: [8, 22, 8],
+                extrapolate: 'clamp',
+              }),
+              opacity: scrollX.interpolate({
+                inputRange: [(index - 0.5) * stride, index * stride, (index + 0.5) * stride],
+                outputRange: [0.45, 1, 0.45],
+                extrapolate: 'clamp',
+              }),
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}

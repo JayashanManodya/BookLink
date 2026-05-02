@@ -1,8 +1,9 @@
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GoogleBrandSignInButton } from '../components/GoogleBrandSignInButton';
 import { useGoogleClerkSignIn } from '../hooks/useGoogleClerkSignIn';
-import { landingPurple, landingPurpleBlob, cascadingWhite } from '../theme/colors';
+import { cascadingWhite, landingPurple, landingPurpleBlob } from '../theme/colors';
+import { fontHandwriting } from '../theme/typography';
 
 /** Full-screen onboarding before Clerk session — matches branded landing layout. */
 export function LandingScreen() {
@@ -19,32 +20,20 @@ export function LandingScreen() {
         <View style={styles.headlineWrap}>
           <Text style={[styles.headlineLine, styles.headlineSoft]}>Welcome</Text>
           <Text style={[styles.headlineLine, styles.headlineSoft]}>to</Text>
-          <Text style={[styles.headlineLine, styles.headlineAccent]}>BookLink</Text>
+          <Text style={[styles.headlineLine, styles.headlineBrand]}>BookLink</Text>
         </View>
 
         <View style={[styles.ctaWrap, { paddingBottom: Math.max(insets.bottom, 20) }]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Log in with Google"
+          <GoogleBrandSignInButton
+            variant="outline"
             onPress={() => void signInWithGoogle()}
-            disabled={busy || !ready}
-            style={({ pressed }) => [styles.ctaOuter, pressed && styles.ctaPressed, busy && styles.ctaDisabled]}
-          >
-            <Text style={styles.ctaLabel}>Log In</Text>
-            <View style={styles.ctaIconCircle}>
-              {busy ? (
-                <ActivityIndicator color={cascadingWhite} size="small" />
-              ) : (
-                <Ionicons name="chevron-forward" size={22} color={cascadingWhite} />
-              )}
-            </View>
-          </Pressable>
+            disabled={!ready}
+            busy={busy}
+          />
           {message ? (
             <Text style={styles.error} accessibilityLiveRegion="polite">
               {message}
             </Text>
-          ) : Platform.OS === 'web' ? (
-            <Text style={styles.webHint}>Sign-in opens in full page — works reliably in mobile browsers.</Text>
           ) : null}
         </View>
       </View>
@@ -100,9 +89,16 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     opacity: 0.92,
   },
-  headlineAccent: {
-    fontWeight: '800',
-    marginTop: 2,
+  /** Caveat — same handwritten accent as Browse hero. */
+  headlineBrand: {
+    fontFamily: fontHandwriting.caveatBold,
+    fontSize: 52,
+    lineHeight: Platform.select({ ios: 56, default: 54 }),
+    letterSpacing: 0.85,
+    marginTop: 6,
+    textShadowColor: 'rgba(24,14,72,0.35)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 10,
   },
   ctaWrap: {
     width: '100%',
@@ -111,51 +107,10 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     alignSelf: 'center',
   },
-  ctaOuter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    backgroundColor: cascadingWhite,
-    borderRadius: 999,
-    paddingLeft: 32,
-    paddingRight: 8,
-    paddingVertical: 8,
-    minHeight: 58,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  ctaPressed: { opacity: 0.94, transform: [{ scale: 0.994 }] },
-  ctaDisabled: { opacity: 0.85 },
-  ctaLabel: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: landingPurple,
-    letterSpacing: 0.2,
-  },
-  ctaIconCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: landingPurple,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   error: {
     color: '#fde8ea',
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
-  },
-  webHint: {
-    color: cascadingWhite,
-    opacity: 0.85,
-    fontSize: 12,
-    textAlign: 'center',
-    lineHeight: 17,
-    paddingHorizontal: 8,
   },
 });
