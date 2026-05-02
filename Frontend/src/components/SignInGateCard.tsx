@@ -1,7 +1,7 @@
 import type { ComponentProps } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { cascadingWhite, dreamland, lead, textSecondary } from '../theme/colors';
+import { cascadingWhite, dreamland, lead, textSecondary, themeSurfaceMuted } from '../theme/colors';
 import { cardShadow } from '../theme/shadows';
 import { SignInWithGoogleButton } from './SignInWithGoogleButton';
 
@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#f0eef5',
+    backgroundColor: themeSurfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },

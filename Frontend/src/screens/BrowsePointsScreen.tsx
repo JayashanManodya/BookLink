@@ -19,14 +19,7 @@ import { api, apiErrorMessage } from '../lib/api';
 import { hasMapCoords, openGoogleMapsDirections, openGoogleMapsSearch } from '../lib/mapsLinks';
 import { confirmDestructive } from '../lib/platformAlert';
 import type { ProfileStackParamList } from '../navigation/profileStackTypes';
-import {
-  cascadingWhite,
-  crunch,
-  dreamland,
-  lead,
-  textSecondary,
-  warmHaze,
-} from '../theme/colors';
+import { cascadingWhite, dreamland, lead, textSecondary, warmHaze, themePageBg, themePrimary, themeSurfaceMuted } from '../theme/colors';
 import { cardShadow } from '../theme/shadows';
 import type { CollectionPoint } from '../types/point';
 
@@ -115,7 +108,7 @@ export function BrowsePointsScreen({ navigation }: Props) {
         <Text style={styles.secondaryTxt}>Add a collection point</Text>
       </Pressable>
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 24 }} color={crunch} />
+        <ActivityIndicator style={{ marginTop: 24 }} color={themePrimary} />
       ) : error ? (
         <Text style={styles.error}>{error}</Text>
       ) : (
@@ -189,7 +182,7 @@ export function BrowsePointsScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: cascadingWhite },
+  flex: { flex: 1, backgroundColor: themePageBg },
   topBar: { paddingHorizontal: 12, paddingBottom: 4 },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
   backText: { fontSize: 16, fontWeight: '600', color: lead },
@@ -204,7 +197,7 @@ const styles = StyleSheet.create({
   search: {
     marginHorizontal: 20,
     marginTop: 12,
-    backgroundColor: '#f3f3f5',
+    backgroundColor: themeSurfaceMuted,
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
@@ -216,7 +209,7 @@ const styles = StyleSheet.create({
   secondary: {
     marginHorizontal: 20,
     marginTop: 10,
-    backgroundColor: crunch,
+    backgroundColor: themePrimary,
     borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',
@@ -260,7 +253,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: crunch,
+    backgroundColor: themePrimary,
     borderRadius: 14,
     paddingVertical: 12,
   },

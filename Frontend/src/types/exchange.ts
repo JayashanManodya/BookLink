@@ -2,6 +2,8 @@ export type ExchangeRequest = {
   _id: string;
   bookId: string;
   bookTitle: string;
+  /** Listing cover (your book when role is received). */
+  bookCoverImageUrl?: string;
   requesterClerkUserId: string;
   ownerClerkUserId: string;
   requesterDisplayName: string;

@@ -16,14 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, apiErrorMessage } from '../lib/api';
 import { confirmDestructive } from '../lib/platformAlert';
 import type { ProfileStackParamList } from '../navigation/profileStackTypes';
-import {
-  cascadingWhite,
-  crunch,
-  dreamland,
-  lead,
-  textSecondary,
-  warmHaze,
-} from '../theme/colors';
+import { cascadingWhite, dreamland, lead, textSecondary, warmHaze, themePageBg, themePrimary, themeSurfaceMuted } from '../theme/colors';
 import { cardShadow } from '../theme/shadows';
 import type { ExchangeReport } from '../types/report';
 
@@ -84,7 +77,7 @@ export function MyReportsScreen({ navigation }: Props) {
         Editable only before you confirm receipt (if you report, you cannot confirm). After confirming, read-only.
       </Text>
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 24 }} color={crunch} />
+        <ActivityIndicator style={{ marginTop: 24 }} color={themePrimary} />
       ) : error ? (
         <Text style={styles.error}>{error}</Text>
       ) : (
@@ -138,7 +131,7 @@ export function MyReportsScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: cascadingWhite },
+  flex: { flex: 1, backgroundColor: themePageBg },
   topBar: { paddingHorizontal: 12, paddingBottom: 4 },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
   backText: { fontSize: 16, fontWeight: '600', color: lead },
@@ -168,7 +161,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 14,
-    backgroundColor: '#f3f3f5',
+    backgroundColor: themeSurfaceMuted,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
   },

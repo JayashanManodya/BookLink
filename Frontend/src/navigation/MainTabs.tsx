@@ -1,5 +1,6 @@
 import { useEffect, type ComponentProps, type ReactNode } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { CommonActions } from '@react-navigation/native';
 import {
   createBottomTabNavigator,
   type BottomTabBarProps,
@@ -13,7 +14,9 @@ import { BrowseStack } from './BrowseStack';
 import { ProfileStack } from './ProfileStack';
 import { RequestsStack } from './RequestsStack';
 import { WishlistStack } from './WishlistStack';
-import { cascadingWhite, dreamland, lead, warmHaze } from '../theme/colors';
+import { themeGreen, themeNavMint, themeNavMintBorder, themePageBg } from '../theme/courseTheme';
+import { chineseSilver } from '../theme/colors';
+import { font } from '../theme/typography';
 
 export type MainTabParamList = {
   Browse: undefined;
@@ -23,10 +26,10 @@ export type MainTabParamList = {
 };
 
 /** Content row height (icons + optional dot); safe area added below. */
-const TAB_BAR_CONTENT_MIN = 20;
-const TAB_BAR_VERTICAL_PAD = 4;
+const TAB_BAR_CONTENT_MIN = 28;
+const TAB_BAR_VERTICAL_PAD = 6;
 const TAB_OVERLAY_PAD = TAB_BAR_CONTENT_MIN + TAB_BAR_VERTICAL_PAD * 2;
-const ACTIVE_DOT = '#e53935';
+const ICON_INACTIVE = '#8E8E8E';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -45,7 +48,6 @@ function AuthApiSetup({ children }: { children: ReactNode }) {
 
 type IonName = ComponentProps<typeof Ionicons>['name'];
 
-/** Outline when idle, solid when active — travel-style tab bar. */
 function iconFor(routeName: string, focused: boolean): IonName {
   if (routeName === 'Browse') return focused ? 'home' : 'home-outline';
   if (routeName === 'Requests') return focused ? 'swap-horizontal' : 'swap-horizontal-outline';
@@ -53,18 +55,43 @@ function iconFor(routeName: string, focused: boolean): IonName {
   return focused ? 'person' : 'person-outline';
 }
 
+function labelFor(routeName: keyof MainTabParamList): string {
+  if (routeName === 'Browse') return 'Home';
+  if (routeName === 'Requests') return 'Exchange';
+  if (routeName === 'Wishlist') return 'Wanted';
+  return 'Profile';
+}
+
 function PillTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 8);
 
+  const live = navigation.getState();
+  const routes = live?.routes ?? state.routes;
+  const rawIdx = typeof live?.index === 'number' ? live.index : state.index;
+  const safeIdx =
+    typeof rawIdx === 'number' &&
+    Number.isFinite(rawIdx) &&
+    routes.length > 0 &&
+    rawIdx >= 0 &&
+    rawIdx < routes.length
+      ? rawIdx
+      : 0;
+
+  const anyFocusedByNav = state.routes.some((r) => {
+    const nav = descriptors[r.key]?.navigation;
+    return typeof nav?.isFocused === 'function' && nav.isFocused();
+  });
+
   return (
     <View style={[styles.tabBarOuter, { paddingBottom: bottomPad }]}>
       <View style={styles.tabBarInner}>
-        {state.routes.map((route) => {
-          const { options } = descriptors[route.key];
-          const isFocused = state.routes[state.index]?.key === route.key;
+        {state.routes.map((route, index) => {
+          const descriptor = descriptors[route.key];
+          const { options, navigation: routeNav } = descriptor;
+          const focusedByNav = typeof routeNav.isFocused === 'function' && routeNav.isFocused();
+          const isFocused = anyFocusedByNav ? focusedByNav : index === safeIdx;
           const ion = iconFor(route.name, isFocused);
-          const iconColor = isFocused ? lead : warmHaze;
 
           const onPress = () => {
             const event = navigation.emit({
@@ -73,7 +100,10 @@ function PillTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               canPreventDefault: true,
             });
             if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
+              navigation.dispatch({
+                ...CommonActions.navigate(route),
+                target: state.key,
+              });
             }
           };
 
@@ -93,8 +123,14 @@ function PillTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               style={styles.tabSlot}
               hitSlop={{ top: 6, bottom: 4, left: 8, right: 8 }}
             >
-              <Ionicons name={ion} size={26} color={iconColor} />
-              <View style={[styles.activeDot, !isFocused && styles.activeDotHidden]} />
+              {isFocused ? (
+                <View style={styles.mintPill}>
+                  <Ionicons name={ion} size={22} color={themeGreen} />
+                  <Text style={styles.mintLabel}>{labelFor(route.name as keyof MainTabParamList)}</Text>
+                </View>
+              ) : (
+                <Ionicons name={ion} size={26} color={ICON_INACTIVE} />
+              )}
             </Pressable>
           );
         })}
@@ -115,7 +151,7 @@ export function MainTabs() {
         screenOptions={{
           headerShown: false,
           tabBarShowLabel: false,
-          sceneStyle: { paddingBottom: contentBottomPad, backgroundColor: cascadingWhite },
+          sceneStyle: { paddingBottom: contentBottomPad, backgroundColor: themePageBg },
         }}
       >
         <Tab.Screen
@@ -126,12 +162,12 @@ export function MainTabs() {
         <Tab.Screen
           name="Requests"
           component={RequestsStack}
-          options={{ tabBarAccessibilityLabel: 'Exchange requests' }}
+          options={{ tabBarAccessibilityLabel: 'Exchange requests and messages' }}
         />
         <Tab.Screen
           name="Wishlist"
           component={WishlistStack}
-          options={{ tabBarAccessibilityLabel: 'Wishlist' }}
+          options={{ tabBarAccessibilityLabel: 'Wanted books board' }}
         />
         <Tab.Screen
           name="Profile"
@@ -153,42 +189,49 @@ const styles = StyleSheet.create({
     paddingTop: TAB_BAR_VERTICAL_PAD,
     backgroundColor: '#ffffff',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: dreamland,
+    borderTopColor: chineseSilver,
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -2 },
+        shadowColor: '#101011',
+        shadowOffset: { width: 0, height: -3 },
         shadowOpacity: 0.06,
-        shadowRadius: 6,
+        shadowRadius: 10,
       },
-      android: { elevation: 12 },
-      web: { boxShadow: '0px -2px 8px rgba(0, 0, 0, 0.06)' },
+      android: { elevation: 10 },
+      web: { boxShadow: '0px -3px 12px rgba(16,16,17,0.06)' },
       default: {},
     }),
   },
   tabBarInner: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-around',
     minHeight: TAB_BAR_CONTENT_MIN,
-    paddingHorizontal: 4,
+    paddingHorizontal: 8,
     backgroundColor: '#ffffff',
   },
   tabSlot: {
     flex: 1,
-    maxWidth: 96,
+    maxWidth: 120,
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingTop: 4,
-    gap: 4,
+    justifyContent: 'center',
+    paddingVertical: 4,
   },
-  activeDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: ACTIVE_DOT,
+  mintPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: themeNavMint,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: themeNavMintBorder,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
   },
-  activeDotHidden: {
-    opacity: 0,
+  mintLabel: {
+    fontFamily: font.semi,
+    fontSize: 13,
+    color: themeGreen,
+    letterSpacing: -0.2,
   },
 });

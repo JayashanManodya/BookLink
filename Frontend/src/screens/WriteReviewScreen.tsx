@@ -17,14 +17,7 @@ import { FormImageAttachment } from '../components/FormImageAttachment';
 import { api, apiErrorMessage } from '../lib/api';
 import { alertOk } from '../lib/platformAlert';
 import type { RequestsStackParamList } from '../navigation/requestsStackTypes';
-import {
-  cascadingWhite,
-  crunch,
-  dreamland,
-  lead,
-  textSecondary,
-  warmHaze,
-} from '../theme/colors';
+import { cascadingWhite, dreamland, lead, textSecondary, warmHaze, themePageBg, themePrimary, themeSurfaceMuted } from '../theme/colors';
 import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { cardShadow } from '../theme/shadows';
 
@@ -149,7 +142,7 @@ export function WriteReviewScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: cascadingWhite },
+  flex: { flex: 1, backgroundColor: themePageBg },
   topBar: { paddingHorizontal: 12, paddingBottom: 4 },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
   backText: { fontSize: 16, fontWeight: '600', color: lead },
@@ -162,7 +155,7 @@ const styles = StyleSheet.create({
   starOn: { color: '#e6b800' },
   input: {
     minHeight: 100,
-    backgroundColor: '#f3f3f5',
+    backgroundColor: themeSurfaceMuted,
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
@@ -174,7 +167,7 @@ const styles = StyleSheet.create({
   },
   submit: {
     marginTop: 8,
-    backgroundColor: crunch,
+    backgroundColor: themePrimary,
     borderRadius: 20,
     paddingVertical: 16,
     alignItems: 'center',

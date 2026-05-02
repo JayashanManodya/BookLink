@@ -13,14 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../lib/api';
 import type { ProfileStackParamList } from '../navigation/profileStackTypes';
-import {
-  cascadingWhite,
-  crunch,
-  dreamland,
-  lead,
-  textSecondary,
-  warmHaze,
-} from '../theme/colors';
+import { cascadingWhite, dreamland, lead, textSecondary, warmHaze, themePageBg, themePrimary, themeSurfaceMuted } from '../theme/colors';
 import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { cardShadow } from '../theme/shadows';
 
@@ -94,7 +87,7 @@ export function EditProfileScreen({ navigation }: Props) {
         <Text style={styles.subtitle}>Update how others see your general location for swaps.</Text>
 
         {loading ? (
-          <ActivityIndicator style={{ marginTop: 24 }} color={crunch} />
+          <ActivityIndicator style={{ marginTop: 24 }} color={themePrimary} />
         ) : (
           <View style={[styles.card, cardShadow]}>
             <Text style={styles.sectionLabel}>Location</Text>
@@ -145,7 +138,7 @@ export function EditProfileScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: cascadingWhite },
+  flex: { flex: 1, backgroundColor: themePageBg },
   topBar: { paddingHorizontal: 12, paddingBottom: 8 },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
   backText: { fontSize: 16, fontWeight: '600', color: lead },
@@ -171,7 +164,7 @@ const styles = StyleSheet.create({
   hint: { fontSize: 13, color: warmHaze, lineHeight: 19, marginBottom: 8 },
   fieldLabel: { fontSize: 13, fontWeight: '700', color: lead },
   input: {
-    backgroundColor: '#f3f3f5',
+    backgroundColor: themeSurfaceMuted,
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
@@ -185,7 +178,7 @@ const styles = StyleSheet.create({
   saveBtn: {
     marginTop: 8,
     alignSelf: 'flex-start',
-    backgroundColor: crunch,
+    backgroundColor: themePrimary,
     paddingHorizontal: 22,
     paddingVertical: 14,
     borderRadius: 999,

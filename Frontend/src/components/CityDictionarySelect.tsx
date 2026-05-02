@@ -11,7 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLLECTION_POINT_CITIES } from '../constants/collectionPointCities';
-import { cascadingWhite, crunch, dreamland, lead, textSecondary, warmHaze } from '../theme/colors';
+import { cascadingWhite, dreamland, lead, textSecondary, themePrimary, themeSurfaceMuted, warmHaze } from '../theme/colors';
 
 type Props = {
   value: string;
@@ -96,7 +96,7 @@ export function CityDictionarySelect({ value, onChange }: Props) {
                   onPress={() => pick(item)}
                 >
                   <Text style={[styles.rowText, item === value && styles.rowTextOn]}>{item}</Text>
-                  {item === value ? <Ionicons name="checkmark-circle" size={22} color={crunch} /> : null}
+                  {item === value ? <Ionicons name="checkmark-circle" size={22} color={themePrimary} /> : null}
                 </Pressable>
               )}
               style={styles.list}
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f3f3f5',
+    backgroundColor: themeSurfaceMuted,
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   sheetTitle: { fontSize: 18, fontWeight: '800', color: lead },
-  sheetDone: { fontSize: 16, fontWeight: '800', color: crunch },
+  sheetDone: { fontSize: 16, fontWeight: '800', color: themePrimary },
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingHorizontal: 12,
     borderRadius: 14,
-    backgroundColor: '#f3f3f5',
+    backgroundColor: themeSurfaceMuted,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
   },

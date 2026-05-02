@@ -1,5 +1,10 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { chatIncoming, chatOutgoing, dreamland, lead, textSecondary, warmHaze } from '../theme/colors';
+import {
+  messengerBubbleIncoming,
+  messengerBubbleIncomingBorder,
+  messengerBubbleOutgoing,
+} from '../theme/chatMessengerTheme';
+import { dreamland, lead, textSecondary, warmHaze } from '../theme/colors';
 import { platformElevation } from '../theme/shadows';
 
 const shadowMine = platformElevation({ offsetY: 1, opacity: 0.08, radius: 2, elevation: 1 });
@@ -47,7 +52,7 @@ function RowAvatar({ name, uri, size }: { name: string; uri?: string; size: numb
   );
 }
 
-/** WhatsApp-style row: wallpaper context; asymmetric bubbles; time inside bubble. */
+/** Course messenger row: mint outgoing bubble, white incoming (matches inbox theme). */
 export function ChatMessageRow({
   mine,
   text,
@@ -139,18 +144,18 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 18,
     borderBottomRightRadius: 18,
   },
-  bubbleMine: { backgroundColor: chatOutgoing },
+  bubbleMine: { backgroundColor: messengerBubbleOutgoing },
   bubbleTheirs: {
-    backgroundColor: chatIncoming,
+    backgroundColor: messengerBubbleIncoming,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(0,0,0,0.06)',
+    borderColor: messengerBubbleIncomingBorder,
   },
   shadowMine,
   shadowTheirs,
   avatarPh: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: chatIncoming,
+    backgroundColor: messengerBubbleIncoming,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
   },

@@ -14,14 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, apiErrorMessage } from '../lib/api';
 import type { ProfileStackParamList } from '../navigation/profileStackTypes';
-import {
-  cascadingWhite,
-  crunch,
-  dreamland,
-  lead,
-  textSecondary,
-  warmHaze,
-} from '../theme/colors';
+import { cascadingWhite, dreamland, lead, textSecondary, warmHaze, themePageBg, themePrimary } from '../theme/colors';
 import { cardShadow } from '../theme/shadows';
 import type { ListerReceivedReport } from '../types/report';
 
@@ -63,7 +56,7 @@ export function ListerReportsReceivedScreen({ navigation }: Props) {
       <Text style={styles.title}>Reports on my swaps</Text>
       <Text style={styles.subtitle}>Issues readers reported before confirming. Tap to open details.</Text>
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 24 }} color={crunch} />
+        <ActivityIndicator style={{ marginTop: 24 }} color={themePrimary} />
       ) : error ? (
         <Text style={styles.error}>{error}</Text>
       ) : (
@@ -112,7 +105,7 @@ export function ListerReportsReceivedScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: cascadingWhite },
+  flex: { flex: 1, backgroundColor: themePageBg },
   topBar: { paddingHorizontal: 12, paddingBottom: 4 },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
   backText: { fontSize: 16, fontWeight: '600', color: lead },

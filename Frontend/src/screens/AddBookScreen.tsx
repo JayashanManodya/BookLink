@@ -23,14 +23,7 @@ import { FormImageAttachment } from '../components/FormImageAttachment';
 import { SignInGateCard } from '../components/SignInGateCard';
 import { SignInWithGoogleButton } from '../components/SignInWithGoogleButton';
 import type { BrowseStackParamList } from '../navigation/browseStackTypes';
-import {
-  cascadingWhite,
-  crunch,
-  dreamland,
-  lead,
-  textSecondary,
-  warmHaze,
-} from '../theme/colors';
+import { cascadingWhite, dreamland, lead, textSecondary, warmHaze, themePageBg, themePrimary, themeSurfaceMuted } from '../theme/colors';
 import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { cardShadow } from '../theme/shadows';
 
@@ -273,7 +266,7 @@ export function AddBookScreen({ navigation }: Props) {
           </View>
 
           <Text style={styles.hint}>
-            After someone&apos;s request is accepted, you&apos;ll choose the meet-up collection point in that chat.
+            After someone&apos;s request is accepted, you&apos;ll choose the meet-up collection point in that exchange thread.
           </Text>
 
           <Pressable style={[styles.submit, cardShadow]} onPress={() => void submit()} disabled={busy}>
@@ -396,7 +389,7 @@ function Field({
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: cascadingWhite },
+  flex: { flex: 1, backgroundColor: themePageBg },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -412,7 +405,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
   hint: { fontSize: 13, color: textSecondary, lineHeight: 18, marginTop: 4 },
   input: {
-    backgroundColor: '#f3f3f5',
+    backgroundColor: themeSurfaceMuted,
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
@@ -426,7 +419,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f3f3f5',
+    backgroundColor: themeSurfaceMuted,
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
@@ -446,12 +439,12 @@ const styles = StyleSheet.create({
     borderColor: dreamland,
     backgroundColor: cascadingWhite,
   },
-  chipOn: { backgroundColor: crunch, borderColor: crunch },
+  chipOn: { backgroundColor: themePrimary, borderColor: themePrimary },
   chipTxt: { fontSize: 13, fontWeight: '700', color: textSecondary, textTransform: 'capitalize' },
-  chipTxtOn: { color: lead },
+  chipTxtOn: { color: cascadingWhite },
   submit: {
     marginTop: 8,
-    backgroundColor: crunch,
+    backgroundColor: themePrimary,
     borderRadius: 20,
     paddingVertical: 16,
     alignItems: 'center',
@@ -473,7 +466,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: dreamland,
   },
-  modalRowOn: { backgroundColor: '#f3f3f5' },
+  modalRowOn: { backgroundColor: themeSurfaceMuted },
   modalRowTxt: { fontSize: 16, color: lead, fontWeight: '600' },
   modalRowTitle: { fontSize: 16, fontWeight: '800', color: lead },
   modalRowSub: { fontSize: 13, color: textSecondary, marginTop: 4 },

@@ -14,13 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../lib/api';
 import { confirmDestructive } from '../lib/platformAlert';
-import {
-  cascadingWhite,
-  crunch,
-  dreamland,
-  lead,
-  textSecondary,
-} from '../theme/colors';
+import { cascadingWhite, dreamland, lead, textSecondary, themePageBg, themePrimary } from '../theme/colors';
 import { cardShadow } from '../theme/shadows';
 import type { Book } from '../types/book';
 import type { ProfileStackParamList } from '../navigation/profileStackTypes';
@@ -83,7 +77,7 @@ export function MyListingsScreen() {
         </Pressable>
       </View>
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 24 }} color={crunch} />
+        <ActivityIndicator style={{ marginTop: 24 }} color={themePrimary} />
       ) : error ? (
         <Text style={styles.error}>{error}</Text>
       ) : (
@@ -132,7 +126,7 @@ export function MyListingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: cascadingWhite },
+  flex: { flex: 1, backgroundColor: themePageBg },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',

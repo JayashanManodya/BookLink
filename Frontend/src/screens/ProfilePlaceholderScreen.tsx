@@ -3,7 +3,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ProfileStackParamList } from '../navigation/profileStackTypes';
-import { cascadingWhite, dreamland, lead, textSecondary } from '../theme/colors';
+import { cascadingWhite, dreamland, lead, textSecondary, themePageBg } from '../theme/colors';
 import { cardShadow } from '../theme/shadows';
 
 /** Legacy placeholder; prefer dedicated screens in ProfileStack. */
@@ -31,7 +31,7 @@ export function ProfilePlaceholderScreen() {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: cascadingWhite },
+  flex: { flex: 1, backgroundColor: themePageBg },
   scroll: { paddingHorizontal: 20, paddingBottom: 32, gap: 14 },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start', marginBottom: 4 },
   backText: { fontSize: 16, fontWeight: '600', color: lead },

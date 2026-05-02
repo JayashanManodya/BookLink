@@ -1,5 +1,12 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '@clerk/clerk-expo';
@@ -9,8 +16,9 @@ import { api, apiErrorMessage } from '../lib/api';
 import { SignInGateCard } from '../components/SignInGateCard';
 import { ChatListRow } from '../components/ChatListRow';
 import type { WishlistStackParamList } from '../navigation/wishlistStackTypes';
-import { cascadingWhite, chineseSilver, crunch, dreamland, lead, textSecondary, warmHaze } from '../theme/colors';
-import { cardShadow } from '../theme/shadows';
+import { themeGreen, themeMuted, themeNavMint, themeNavMintBorder } from '../theme/courseTheme';
+import { lead, textSecondary } from '../theme/colors';
+import { font } from '../theme/typography';
 
 type TabKey = 'poster' | 'helper';
 
@@ -51,7 +59,7 @@ export function WishlistChatsScreen({ navigation }: Props) {
       });
       setChats(res.data.chats ?? []);
     } catch (e: unknown) {
-      setError(apiErrorMessage(e, 'Could not load chats'));
+      setError(apiErrorMessage(e, 'Could not load messages'));
     } finally {
       setLoading(false);
     }
@@ -72,143 +80,245 @@ export function WishlistChatsScreen({ navigation }: Props) {
     });
   };
 
+  const topPad = Math.max(insets.top, 10);
+
+  const headerRow = (
+    <View style={[styles.topBar, { paddingTop: topPad }]}>
+      <Pressable
+        style={styles.iconBtn}
+        onPress={() => navigation.goBack()}
+        hitSlop={10}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+      >
+        <Ionicons name="chevron-back" size={26} color={lead} />
+      </Pressable>
+      <Text style={[styles.screenTitle, { fontFamily: font.bold }]} numberOfLines={1}>
+        Wanted books · inbox
+      </Text>
+      <Pressable
+        style={styles.iconBtn}
+        onPress={() => void load()}
+        hitSlop={10}
+        accessibilityRole="button"
+        accessibilityLabel="Refresh messages"
+        disabled={loading}
+      >
+        <Ionicons name="refresh" size={22} color={loading ? themeMuted : lead} />
+      </Pressable>
+    </View>
+  );
+
   if (!isSignedIn) {
     return (
-      <ScrollView
-        style={styles.root}
-        contentContainerStyle={[styles.scroll, { paddingTop: Math.max(insets.top, 8) + 8 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.title}>Wishlist chats</Text>
-        <Text style={styles.subtitle}>Conversations about wanted books.</Text>
-        <SignInGateCard
-          title="Sign in to see chats"
-          message="Use Google to view threads on your posts and ones you joined."
-          icon="chatbubbles-outline"
-        />
-      </ScrollView>
+      <View style={styles.screen}>
+        {headerRow}
+        <ScrollView
+          contentContainerStyle={[styles.signedOutScroll, { paddingBottom: insets.bottom + 24 }]}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Pressable
+            style={styles.boardLink}
+            onPress={() => navigation.navigate('WishlistBoard')}
+            accessibilityRole="button"
+          >
+            <Ionicons name="book-outline" size={18} color={themeGreen} />
+            <Text style={[styles.boardLinkTxt, { fontFamily: font.semi }]}>Open wanted books board</Text>
+          </Pressable>
+          <SignInGateCard
+            title="Sign in to see messages"
+            message="Use Google to view threads on your wanted posts and ones you joined."
+            icon="chatbubbles-outline"
+          />
+        </ScrollView>
+      </View>
     );
   }
 
   return (
-    <View style={[styles.root, { paddingTop: Math.max(insets.top, 8) + 8 }]}>
-      <View style={styles.headerPad}>
-        <View style={styles.headRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.title}>Wishlist chats</Text>
-            <Text style={styles.subtitle}>Threads on your wanted posts and ones you replied to.</Text>
-          </View>
-          <Pressable style={styles.boardPill} onPress={() => navigation.navigate('WishlistBoard')} hitSlop={6}>
-            <Ionicons name="heart-outline" size={18} color={lead} />
-            <Text style={styles.boardPillTxt}>Board</Text>
+    <View style={styles.screen}>
+      {headerRow}
+      <View style={[styles.body, { paddingBottom: insets.bottom + 24 }]}>
+        <View style={styles.tabsRow}>
+          <Pressable
+            onPress={() => setTab('poster')}
+            style={[styles.tabChip, tab === 'poster' && styles.tabChipActive]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tab === 'poster' }}
+          >
+            <Text
+              style={[
+                styles.tabChipTxt,
+                { fontFamily: tab === 'poster' ? font.semi : font.medium },
+                tab === 'poster' && styles.tabChipTxtActive,
+              ]}
+            >
+              My posts
+            </Text>
           </Pressable>
-          <Pressable onPress={() => void load()} style={styles.iconBtn} hitSlop={8} disabled={loading}>
-            <Ionicons name="refresh" size={22} color={lead} />
+          <Pressable
+            onPress={() => setTab('helper')}
+            style={[styles.tabChip, tab === 'helper' && styles.tabChipActive]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tab === 'helper' }}
+          >
+            <Text
+              style={[
+                styles.tabChipTxt,
+                { fontFamily: tab === 'helper' ? font.semi : font.medium },
+                tab === 'helper' && styles.tabChipTxtActive,
+              ]}
+            >
+              Helping
+            </Text>
           </Pressable>
         </View>
 
-        <View style={styles.tabs}>
-          <Pressable onPress={() => setTab('poster')} style={[styles.tab, tab === 'poster' && styles.tabOn]}>
-            <Text style={[styles.tabText, tab === 'poster' && styles.tabTextOn]}>My posts</Text>
-          </Pressable>
-          <Pressable onPress={() => setTab('helper')} style={[styles.tab, tab === 'helper' && styles.tabOn]}>
-            <Text style={[styles.tabText, tab === 'helper' && styles.tabTextOn]}>Helping</Text>
-          </Pressable>
-        </View>
-      </View>
-
-      {loading ? (
-        <ActivityIndicator style={{ marginTop: 24 }} color={crunch} />
-      ) : error ? (
-        <Text style={[styles.error, styles.headerPad]}>{error}</Text>
-      ) : (
-        <ScrollView
-          style={styles.listFlex}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator
+        <Pressable
+          style={styles.boardLinkRow}
+          onPress={() => navigation.navigate('WishlistBoard')}
+          accessibilityRole="button"
         >
-          {chats.length === 0 ? (
-            <View style={[styles.card, cardShadow, styles.headerPad]}>
-              <Text style={styles.body}>
-                {tab === 'poster'
-                  ? 'No chats yet on your wanted posts. When someone messages you, it will show here.'
-                  : 'No threads yet where you offered a book. Open a wanted post and tap to start a chat.'}
-              </Text>
-            </View>
-          ) : (
-            chats.map((c) => (
-              <ChatListRow
-                key={c.threadId}
-                title={c.peerName}
-                preview={c.preview}
-                lastMessageSenderClerkUserId={c.lastMessageSenderClerkUserId}
-                peerNameForPrefix={c.peerName}
-                myUserId={userId}
-                dateIso={c.lastAt}
-                imageUrl={c.peerAvatarUrl}
-                fallbackLetter={c.peerName || '?'}
-                onPress={() => openThread(c)}
-                contextHint={truncateHint(c.itemTitle, 40)}
-              />
-            ))
-          )}
-        </ScrollView>
-      )}
+          <Ionicons name="book-outline" size={18} color={themeGreen} />
+          <Text style={[styles.boardLinkTxt, { fontFamily: font.semi }]}>Wanted books board</Text>
+          <Ionicons name="chevron-forward" size={16} color={themeMuted} />
+        </Pressable>
+
+        {loading ? (
+          <ActivityIndicator style={{ marginTop: 28 }} color={themeGreen} />
+        ) : error ? (
+          <Text style={styles.error}>{error}</Text>
+        ) : (
+          <ScrollView
+            style={styles.listFlex}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator
+          >
+            {chats.length === 0 ? (
+              <View style={styles.emptyWrap}>
+                <Text style={[styles.emptyBody, { fontFamily: font.regular }]}>
+                  {tab === 'poster'
+                    ? 'No messages yet on your wanted posts. When someone reaches out, it will show here.'
+                    : 'No threads yet where you offered a book. Open a wanted post and tap to send a message.'}
+                </Text>
+              </View>
+            ) : (
+              chats.map((c) => (
+                <ChatListRow
+                  key={c.threadId}
+                  variant="inbox"
+                  title={c.peerName}
+                  preview={c.preview}
+                  lastMessageSenderClerkUserId={c.lastMessageSenderClerkUserId}
+                  peerNameForPrefix={c.peerName}
+                  myUserId={userId}
+                  dateIso={c.lastAt}
+                  imageUrl={c.peerAvatarUrl}
+                  fallbackLetter={c.peerName || '?'}
+                  onPress={() => openThread(c)}
+                  contextHint={truncateHint(c.itemTitle, 40)}
+                />
+              ))
+            )}
+          </ScrollView>
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: cascadingWhite, paddingBottom: 24 },
-  headerPad: { paddingHorizontal: 20 },
-  scroll: { paddingBottom: 32, paddingHorizontal: 20 },
-  listFlex: { flex: 1 },
-  listContent: { paddingBottom: 40, flexGrow: 1 },
-  headRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
-  title: { fontSize: 28, fontWeight: '800', color: lead, letterSpacing: -0.5 },
-  subtitle: { marginTop: 4, fontSize: 15, color: warmHaze, fontWeight: '600', maxWidth: '72%' },
-  boardPill: {
+  screen: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'space-between',
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 999,
-    backgroundColor: chineseSilver,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-    marginTop: 2,
+    paddingBottom: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#ECECEC',
   },
-  boardPillTxt: { fontSize: 14, fontWeight: '800', color: lead },
   iconBtn: {
     width: 44,
     height: 44,
-    borderRadius: 22,
-    backgroundColor: cascadingWhite,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
     alignItems: 'center',
     justifyContent: 'center',
-    ...cardShadow,
   },
-  tabs: {
+  screenTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 18,
+    color: lead,
+    letterSpacing: -0.3,
+  },
+  body: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+  },
+  tabsRow: {
     flexDirection: 'row',
-    marginTop: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: dreamland,
+    gap: 10,
+    marginBottom: 14,
   },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  tabOn: { borderBottomWidth: 2, borderBottomColor: crunch },
-  tabText: { fontSize: 15, fontWeight: '600', color: warmHaze },
-  tabTextOn: { color: lead, fontWeight: '800' },
-  card: {
-    marginTop: 4,
-    backgroundColor: cascadingWhite,
-    borderRadius: 24,
-    padding: 20,
+  tabChip: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    alignItems: 'center',
+    backgroundColor: '#F4F4F6',
+  },
+  tabChipActive: {
+    backgroundColor: themeNavMint,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
+    borderColor: themeNavMintBorder,
   },
-  body: { fontSize: 15, lineHeight: 22, color: textSecondary },
-  error: { color: '#b3261e', marginTop: 12 },
+  tabChipTxt: {
+    fontSize: 14,
+    color: themeMuted,
+  },
+  tabChipTxtActive: {
+    color: themeGreen,
+  },
+  boardLinkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  boardLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+    alignSelf: 'flex-start',
+  },
+  boardLinkTxt: {
+    fontSize: 14,
+    color: themeGreen,
+  },
+  signedOutScroll: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  listFlex: { flex: 1 },
+  listContent: { paddingBottom: 40, flexGrow: 1 },
+  emptyWrap: {
+    paddingVertical: 28,
+    paddingHorizontal: 12,
+  },
+  emptyBody: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: textSecondary,
+    textAlign: 'center',
+  },
+  error: { color: '#b3261e', marginTop: 16, fontSize: 14, fontFamily: font.regular },
 });

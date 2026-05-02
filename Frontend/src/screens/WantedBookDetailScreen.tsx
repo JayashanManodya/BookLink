@@ -18,14 +18,7 @@ import { confirmDestructive } from '../lib/platformAlert';
 import type { WishlistStackParamList } from '../navigation/wishlistStackTypes';
 import type { WishlistItem } from '../types/wishlist';
 import type { WishlistHelpThread } from '../types/wishlistThread';
-import {
-  cascadingWhite,
-  crunch,
-  dreamland,
-  lead,
-  textSecondary,
-  warmHaze,
-} from '../theme/colors';
+import { cascadingWhite, dreamland, lead, textSecondary, warmHaze, themePageBg, themePrimary, themeSurfaceMuted } from '../theme/colors';
 import { cardShadow } from '../theme/shadows';
 
 type Props = NativeStackScreenProps<WishlistStackParamList, 'WantedBookDetail'>;
@@ -83,7 +76,7 @@ export function WantedBookDetailScreen({ navigation, route }: Props) {
         peerAvatarUrl: it.ownerAvatarUrl,
       });
     } catch (e: unknown) {
-      Alert.alert('Error', apiErrorMessage(e, 'Could not open chat'));
+      Alert.alert('Error', apiErrorMessage(e, 'Could not open messages'));
     } finally {
       setBusy(false);
     }
@@ -115,7 +108,7 @@ export function WantedBookDetailScreen({ navigation, route }: Props) {
     const title = item.title;
     confirmDestructive({
       title: 'Delete wanted book?',
-      message: `"${title}" will be removed from the community board along with any help chats.`,
+      message: `"${title}" will be removed from the community board along with any offer threads.`,
       confirmLabel: 'Delete',
       onConfirm: () =>
         void (async () => {
@@ -138,7 +131,7 @@ export function WantedBookDetailScreen({ navigation, route }: Props) {
             <Text style={styles.backText}>Back</Text>
           </Pressable>
         </View>
-        <ActivityIndicator style={{ marginTop: 40 }} color={crunch} />
+        <ActivityIndicator style={{ marginTop: 40 }} color={themePrimary} />
       </View>
     );
   }
@@ -190,7 +183,7 @@ export function WantedBookDetailScreen({ navigation, route }: Props) {
           <View style={[styles.card, cardShadow]}>
             <Text style={styles.cardTitle}>Your wanted post</Text>
             <Text style={styles.cardBody}>
-              When someone has this book, they can message you here. Open a chat below to reply.
+              When someone has this book, they can message you here. Open a thread below to reply.
             </Text>
             {item.status === 'open' ? (
               <View style={styles.ownerActionsRow}>
@@ -237,7 +230,7 @@ export function WantedBookDetailScreen({ navigation, route }: Props) {
                   <Ionicons name="chatbubble-ellipses-outline" size={22} color={lead} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.threadName}>{t.helperDisplayName || 'Reader'}</Text>
-                    <Text style={styles.threadHint}>Tap to open chat</Text>
+                    <Text style={styles.threadHint}>Tap to open messages</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color={warmHaze} />
                 </Pressable>
@@ -252,8 +245,8 @@ export function WantedBookDetailScreen({ navigation, route }: Props) {
               {busy ? <ActivityIndicator color={lead} /> : <Text style={styles.primaryBtnTxt}>Message & offer this book</Text>}
             </Pressable>
             <Text style={styles.hint}>
-              Start a private chat with the person who wants it. You can coordinate a handoff and set a meet-up right
-              from the chat.
+              Start a private thread with the person who wants it. You can coordinate a handoff and set a meet-up right
+              from the conversation.
             </Text>
           </View>
         ) : null}
@@ -273,7 +266,7 @@ function urgencyStyle(u: WishlistItem['urgency']) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: cascadingWhite },
+  flex: { flex: 1, backgroundColor: themePageBg },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingBottom: 8 },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, width: 88 },
   backText: { fontSize: 15, fontWeight: '600', color: lead },
@@ -303,7 +296,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#f3f3f5',
+    backgroundColor: themeSurfaceMuted,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 14,
@@ -337,7 +330,7 @@ const styles = StyleSheet.create({
   threadHint: { fontSize: 12, color: warmHaze, marginTop: 2 },
   primaryBtn: {
     marginTop: 8,
-    backgroundColor: crunch,
+    backgroundColor: themePrimary,
     borderRadius: 20,
     paddingVertical: 16,
     alignItems: 'center',

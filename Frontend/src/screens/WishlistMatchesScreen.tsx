@@ -13,14 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../lib/api';
 import type { WishlistStackParamList } from '../navigation/wishlistStackTypes';
-import {
-  cascadingWhite,
-  crunch,
-  dreamland,
-  lead,
-  textSecondary,
-  warmHaze,
-} from '../theme/colors';
+import { cascadingWhite, dreamland, lead, textSecondary, warmHaze, themePageBg, themePrimary } from '../theme/colors';
 import { cardShadow } from '../theme/shadows';
 import type { Book } from '../types/book';
 import type { WishlistItem } from '../types/wishlist';
@@ -69,16 +62,16 @@ export function WishlistMatchesScreen({ navigation }: Props) {
           <Text style={styles.backText}>Back</Text>
         </Pressable>
       </View>
-      <Text style={styles.title}>Wishlist matches</Text>
+      <Text style={styles.title}>Wanted book matches</Text>
       <Text style={styles.sub}>Open listings that may fit what you are looking for.</Text>
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 24 }} color={crunch} />
+        <ActivityIndicator style={{ marginTop: 24 }} color={themePrimary} />
       ) : error ? (
         <Text style={styles.error}>{error}</Text>
       ) : (
         <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
           {matches.length === 0 ? (
-            <Text style={styles.empty}>No open wishlist items to match.</Text>
+            <Text style={styles.empty}>No open wanted posts to match.</Text>
           ) : (
             matches.map((m) => (
               <View key={m.wishlistItem._id} style={[styles.block, cardShadow]}>
@@ -116,7 +109,7 @@ export function WishlistMatchesScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: cascadingWhite },
+  flex: { flex: 1, backgroundColor: themePageBg },
   topBar: { paddingHorizontal: 12, paddingBottom: 4 },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
   backText: { fontSize: 16, fontWeight: '600', color: lead },
@@ -145,7 +138,7 @@ const styles = StyleSheet.create({
   },
   bookTitle: { fontSize: 15, fontWeight: '800', color: lead },
   bookAuthor: { fontSize: 13, color: textSecondary },
-  view: { fontSize: 14, fontWeight: '800', color: crunch },
+  view: { fontSize: 14, fontWeight: '800', color: themePrimary },
   empty: { fontSize: 15, color: textSecondary },
   error: { color: '#b3261e', marginHorizontal: 20 },
 });

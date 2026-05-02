@@ -1,60 +1,83 @@
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
+  type ImageStyle,
 } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, apiErrorMessage } from '../lib/api';
-import { confirmDestructive } from '../lib/platformAlert';
-import { pickChatImageFromLibrary } from '../lib/pickChatImage';
-import { uploadChatImage } from '../lib/uploadChatImage';
-import { FormImageAttachment } from '../components/FormImageAttachment';
-import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { SignInGateCard } from '../components/SignInGateCard';
+import { CourseScreenShell } from '../components/CourseScreenShell';
 import type { RequestsStackParamList } from '../navigation/requestsStackTypes';
+import { cascadingWhite, textSecondary, themeSurfaceMuted } from '../theme/colors';
 import {
-  cascadingWhite,
-  chineseSilver,
-  crunch,
-  dreamland,
-  lead,
-  textSecondary,
-  warmHaze,
-} from '../theme/colors';
+  themeGreen,
+  themeInk,
+  themeOrange,
+  themePrimary,
+} from '../theme/courseTheme';
 import { cardShadow } from '../theme/shadows';
+import { font } from '../theme/typography';
 import type { ExchangeRequest } from '../types/exchange';
+
+/** Tints/borders derived only from palette (#716EFF, #38A336, #FF8A33, #101011). */
+const REQ_SUBTEXT = 'rgba(16,16,17,0.55)';
+const REQ_BORDER = 'rgba(16,16,17,0.12)';
+const REQ_PURPLE_FILL = 'rgba(113,110,255,0.12)';
 
 type TabKey = 'received' | 'sent';
 
 type Props = NativeStackScreenProps<RequestsStackParamList, 'RequestsHome'>;
 
+function formatRequestTimestamp(iso?: string): { time: string; date: string } {
+  if (!iso) return { time: '', date: '' };
+  try {
+    const d = new Date(iso);
+    return {
+      time: d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
+      date: d.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', year: 'numeric' }),
+    };
+  } catch {
+    return { time: '', date: '' };
+  }
+}
+
+function capitalizeWord(s: string) {
+  if (!s) return '';
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function relativeListingAge(iso?: string): string {
+  if (!iso) return 'Recently';
+  try {
+    const d = new Date(iso);
+    const diffMs = Date.now() - d.getTime();
+    if (diffMs < 0) return 'Recently';
+    const days = Math.floor(diffMs / 86400000);
+    if (days < 1) return 'Today';
+    if (days === 1) return '1 day ago';
+    if (days < 7) return `${days} days ago`;
+    if (days < 30) return `${Math.floor(days / 7)} wk ago`;
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  } catch {
+    return 'Recently';
+  }
+}
+
 export function RequestsScreen({ navigation }: Props) {
-  const insets = useSafeAreaInsets();
   const { isSignedIn } = useAuth();
   const [tab, setTab] = useState<TabKey>('received');
   const [requests, setRequests] = useState<ExchangeRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [editOpen, setEditOpen] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editBookTitle, setEditBookTitle] = useState('');
-  const [editMessage, setEditMessage] = useState('');
-  const [editPhotoUrl, setEditPhotoUrl] = useState('');
-  const [editPhotoLocalUri, setEditPhotoLocalUri] = useState<string | null>(null);
-  const [editPhotoMime, setEditPhotoMime] = useState<string | null>(null);
-  const [editBusy, setEditBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,703 +101,267 @@ export function RequestsScreen({ navigation }: Props) {
     }, [isSignedIn, tab, load])
   );
 
-  const updateStatus = async (id: string, status: 'accepted' | 'rejected' | 'cancelled') => {
-    try {
-      await api.patch(`/api/requests/${id}`, { status });
-      void load();
-    } catch (e: unknown) {
-      Alert.alert('Error', apiErrorMessage(e, 'Could not update'));
-    }
-  };
-
-  const confirmReceipt = async (id: string) => {
-    try {
-      await api.post(`/api/requests/${id}/confirm-receipt`);
-      void load();
-    } catch (e: unknown) {
-      Alert.alert('Error', apiErrorMessage(e, 'Could not confirm receipt'));
-    }
-  };
-
-  const confirmBookReceived = (id: string) => {
-    confirmDestructive({
-      title: 'Confirm you received the book',
-      message: 'Mark this exchange as successfully received. After confirming, you won\u2019t be able to undo this.',
-      cancelLabel: 'Not yet',
-      confirmLabel: 'Yes, I got it',
-      confirmStyle: 'default',
-      onConfirm: () => void confirmReceipt(id),
-    });
-  };
-
-  const openEdit = (r: ExchangeRequest) => {
-    setEditId(r._id);
-    setEditBookTitle(r.bookTitle || 'Book');
-    setEditMessage(r.message || '');
-    setEditPhotoUrl(r.offeredBookPhoto || '');
-    setEditPhotoLocalUri(null);
-    setEditPhotoMime(null);
-    setEditOpen(true);
-  };
-
-  const closeEdit = () => {
-    if (editBusy) return;
-    setEditOpen(false);
-    setEditId(null);
-    setEditPhotoLocalUri(null);
-    setEditPhotoMime(null);
-  };
-
-  const pickEditPhoto = async () => {
-    const picked = await pickChatImageFromLibrary({ aspectBookCover: true });
-    if (!picked) return;
-    setEditPhotoLocalUri(picked.uri);
-    setEditPhotoMime(picked.mimeType);
-  };
-
-  const removeEditPhoto = () => {
-    setEditPhotoLocalUri(null);
-    setEditPhotoMime(null);
-    setEditPhotoUrl('');
-  };
-
-  const saveEdit = async () => {
-    if (!editId || editBusy) return;
-    setEditBusy(true);
-    try {
-      let finalPhoto = editPhotoUrl;
-      if (editPhotoLocalUri) {
-        const url = await uploadChatImage(editPhotoLocalUri, editPhotoMime);
-        if (!url) {
-          Alert.alert('Upload', 'Could not upload photo.');
-          setEditBusy(false);
-          return;
-        }
-        finalPhoto = url;
-      }
-      await api.patch(`/api/requests/${editId}/edit`, {
-        message: editMessage.trim(),
-        offeredBookPhoto: finalPhoto || '',
-      });
-      setEditOpen(false);
-      setEditId(null);
-      setEditPhotoLocalUri(null);
-      setEditPhotoMime(null);
-      void load();
-    } catch (e: unknown) {
-      Alert.alert('Error', apiErrorMessage(e, 'Could not save changes'));
-    } finally {
-      setEditBusy(false);
-    }
-  };
-
-  const deleteRequest = async (id: string) => {
-    try {
-      await api.delete(`/api/requests/${id}`);
-      setRequests((prev) => prev.filter((r) => r._id !== id));
-    } catch (e: unknown) {
-      Alert.alert('Error', apiErrorMessage(e, 'Could not delete request'));
-    }
-  };
-
-  const cancelSent = (id: string) => {
-    confirmDestructive({
-      title: 'Cancel request',
-      message: 'Mark this request as cancelled?',
-      cancelLabel: 'No',
-      confirmLabel: 'Cancel request',
-      onConfirm: () => void updateStatus(id, 'cancelled'),
-    });
-  };
-
-  const confirmDeleteRequest = (id: string) => {
-    confirmDestructive({
-      title: 'Delete request',
-      message: 'Remove this request and its chat history?',
-      confirmLabel: 'Delete',
-      onConfirm: () => void deleteRequest(id),
-    });
-  };
-
   if (!isSignedIn) {
     return (
-      <ScrollView
-        style={styles.root}
-        contentContainerStyle={[styles.scroll, { paddingTop: Math.max(insets.top, 8) + 8 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.title}>Requests</Text>
-        <Text style={styles.subtitle}>Trades & borrows</Text>
+      <CourseScreenShell title="Requests" subtitle="Trades & borrows" scroll scrollContentStyle={{ gap: 16 }}>
         <SignInGateCard
           title="Sign in to see requests"
           message="Exchange and borrow requests appear here once you are signed in with Google."
           icon="swap-horizontal-outline"
         />
-      </ScrollView>
+      </CourseScreenShell>
     );
   }
 
   return (
-    <View style={[styles.root, { paddingTop: Math.max(insets.top, 8) + 8 }]}>
-      <View style={styles.headRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>Requests</Text>
-          <Text style={styles.subtitle}>Offers on your books and what you have sent.</Text>
+    <CourseScreenShell
+      title="Requests"
+      subtitle="Offers on your books and what you have sent."
+      scroll={false}
+      headerRight={
+        <Pressable style={styles.headerChatsBtn} onPress={() => navigation.navigate('ChatsInbox')} hitSlop={6}>
+          <Ionicons name="chatbubbles-outline" size={18} color={cascadingWhite} />
+          <Text style={styles.headerChatsTxt}>Inbox</Text>
+        </Pressable>
+      }
+    >
+      <View style={styles.signedInBody}>
+        <View style={styles.tabsPill}>
+          <Pressable
+            onPress={() => setTab('received')}
+            style={[styles.tabPill, tab === 'received' && styles.tabPillOn]}
+          >
+            <Text style={[styles.tabPillTxt, tab === 'received' && styles.tabPillTxtOn]}>Received</Text>
+          </Pressable>
+          <Pressable onPress={() => setTab('sent')} style={[styles.tabPill, tab === 'sent' && styles.tabPillOn]}>
+            <Text style={[styles.tabPillTxt, tab === 'sent' && styles.tabPillTxtOn]}>Sent</Text>
+          </Pressable>
         </View>
-        <Pressable style={styles.chatsPill} onPress={() => navigation.navigate('ChatsInbox')} hitSlop={6}>
-          <Ionicons name="chatbubbles-outline" size={18} color={lead} />
-          <Text style={styles.chatsPillTxt}>Chats</Text>
-        </Pressable>
-      </View>
-      <View style={styles.tabs}>
-        <Pressable onPress={() => setTab('received')} style={[styles.tab, tab === 'received' && styles.tabOn]}>
-          <Text style={[styles.tabText, tab === 'received' && styles.tabTextOn]}>Received</Text>
-        </Pressable>
-        <Pressable onPress={() => setTab('sent')} style={[styles.tab, tab === 'sent' && styles.tabOn]}>
-          <Text style={[styles.tabText, tab === 'sent' && styles.tabTextOn]}>Sent</Text>
-        </Pressable>
-      </View>
-      {loading ? (
-        <ActivityIndicator style={{ marginTop: 24 }} color={crunch} />
-      ) : error ? (
-        <Text style={styles.error}>{error}</Text>
-      ) : (
-        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-          {requests.length === 0 ? (
-            <View style={[styles.card, cardShadow]}>
-              <Text style={styles.body}>
-                {tab === 'received'
-                  ? 'No incoming requests yet. When someone wants your book, it will land here.'
-                  : 'You have not sent any requests yet. Open a book and tap Request exchange.'}
-              </Text>
-            </View>
-          ) : (
-            requests.map((r) => (
-              <View key={r._id} style={[styles.reqCard, cardShadow]}>
-                <View style={styles.reqTop}>
-                  <View style={styles.personRow}>
-                    <Avatar
-                      name={tab === 'received' ? r.requesterDisplayName || 'Reader' : r.ownerDisplayName || 'Book lister'}
-                      uri={tab === 'received' ? r.requesterAvatarUrl : r.ownerAvatarUrl}
-                    />
-                    <View style={{ flex: 1 }}>
-                    <Text style={styles.reqName}>
-                      {tab === 'received' ? r.requesterDisplayName || 'Reader' : r.ownerDisplayName || 'Book lister'}
-                    </Text>
-                    <Text style={styles.reqBook}>For: {r.bookTitle || 'Book'}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.rightTop}>
-                    <View style={styles.rightBtnRow}>
-                      {tab === 'sent' && r.status === 'pending' ? (
-                        <Pressable
-                          style={styles.editBtn}
-                          onPress={() => openEdit(r)}
-                          hitSlop={8}
-                          accessibilityLabel="Edit request"
-                        >
-                          <Ionicons name="create-outline" size={16} color={lead} />
-                        </Pressable>
-                      ) : null}
-                      <Pressable
-                        style={styles.deleteBtn}
-                        onPress={() =>
-                          tab === 'sent' && r.status === 'pending' ? cancelSent(r._id) : confirmDeleteRequest(r._id)
-                        }
-                        hitSlop={8}
-                      >
-                        <Ionicons
-                          name={tab === 'sent' && r.status === 'pending' ? 'close-circle-outline' : 'trash-outline'}
-                          size={16}
-                          color="#b3261e"
-                        />
-                      </Pressable>
-                    </View>
-                    <Text style={[styles.status, statusStyle(r.status)]}>{r.status}</Text>
-                  </View>
-                </View>
-                {r.message ? (
-                  <Text style={styles.msg}>&ldquo;{r.message}&rdquo;</Text>
-                ) : null}
-                {r.offeredBookPhoto ? (
-                  <Image source={{ uri: r.offeredBookPhoto }} style={styles.offered} resizeMode="cover" />
-                ) : null}
-                {tab === 'sent' && r.status === 'accepted' ? (
-                  <View style={styles.receiptPromptBlock}>
-                    {!r.requesterConfirmedAt ? (
-                      r.myExchangeReportId ? (
-                        <View style={styles.reportBlockedBlock}>
-                          <Text style={styles.reportBlockedTxt}>
-                            You filed a report for this swap. Receipt confirmation is not available.
-                          </Text>
-                          <Pressable
-                            style={styles.reportEditFullWidth}
-                            onPress={() =>
-                              navigation.navigate('ReportExchange', {
-                                exchangeRequestId: r._id,
-                                bookTitle: r.bookTitle || 'Book',
-                                reportId: r.myExchangeReportId,
-                              })
-                            }
-                          >
-                            <Text style={styles.reportEditTxt}>Your report</Text>
-                          </Pressable>
-                        </View>
-                      ) : (
-                        <>
-                          <Text style={styles.confirmHint}>
-                            Confirm when you have the book, or report a problem first. If you report, you cannot confirm
-                            receipt afterward.
-                          </Text>
-                          <View style={styles.preConfirmRow}>
-                            <Pressable style={styles.confirmBtnHalf} onPress={() => confirmBookReceived(r._id)}>
-                              <Ionicons name="checkmark-circle-outline" size={17} color="#27500a" />
-                              <Text style={styles.confirmTxt}>Confirm receipt</Text>
-                            </Pressable>
-                            <Pressable
-                              style={styles.reportBtnHalf}
-                              onPress={() =>
-                                navigation.navigate('ReportExchange', {
-                                  exchangeRequestId: r._id,
-                                  bookTitle: r.bookTitle || 'Book',
-                                })
-                              }
-                            >
-                              <Ionicons name="flag-outline" size={16} color="#8b2500" />
-                              <Text style={styles.reportTxt}>Report</Text>
-                            </Pressable>
-                          </View>
-                        </>
-                      )
-                    ) : (
-                      <>
-                        <Text style={styles.confirmedDone}>
-                          <Ionicons name="checkmark-circle" size={14} color="#27500a" /> You confirmed receipt of this book
-                        </Text>
-                        {!r.hasExchangeReview ? (
-                          <Pressable
-                            style={styles.reviewBtn}
-                            onPress={() =>
-                              navigation.navigate('WriteReview', {
-                                exchangeRequestId: r._id,
-                                revieweeClerkUserId: r.ownerClerkUserId,
-                                revieweeName: r.ownerDisplayName || 'Lister',
-                              })
-                            }
-                          >
-                            <Text style={styles.reviewTxt}>Leave a review</Text>
-                          </Pressable>
+        {loading ? (
+          <ActivityIndicator style={{ marginTop: 24 }} color={themePrimary} />
+        ) : error ? (
+          <Text style={styles.error}>{error}</Text>
+        ) : (
+          <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+            {requests.length === 0 ? (
+              <View style={[styles.card, cardShadow]}>
+                <Text style={styles.body}>
+                  {tab === 'received'
+                    ? 'No incoming requests yet. When someone wants your book, it will land here.'
+                    : 'You have not sent any requests yet. Open a book and tap Request exchange.'}
+                </Text>
+              </View>
+            ) : (
+              requests.map((r) => {
+                const ts = formatRequestTimestamp(r.createdAt);
+                const peerLabel =
+                  tab === 'received' ? r.requesterDisplayName?.trim() || 'Reader' : r.ownerDisplayName?.trim() || 'Lister';
+                const rel = relativeListingAge(r.createdAt);
+                return (
+                  <Pressable
+                    key={r._id}
+                    style={({ pressed }) => [styles.compactCard, cardShadow, pressed && styles.compactPressed]}
+                    onPress={() => navigation.navigate('ExchangeRequestDetail', { requestId: r._id })}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${r.bookTitle || 'Book'}, ${capitalizeWord(r.status)}`}
+                  >
+                    <View style={styles.compactRow}>
+                      <View style={styles.compactThumb}>
+                        {r.bookCoverImageUrl ? (
+                          <Image
+                            source={{ uri: r.bookCoverImageUrl }}
+                            style={styles.compactThumbImg as ImageStyle}
+                            resizeMode="cover"
+                          />
                         ) : (
-                          <Text style={styles.reviewDone}>You reviewed this exchange</Text>
+                          <View style={styles.compactThumbPh}>
+                            <Ionicons name="book-outline" size={28} color={themePrimary} />
+                          </View>
                         )}
-                      </>
-                    )}
-                  </View>
-                ) : null}
-                {tab === 'received' && r.status === 'pending' ? (
-                  <View style={styles.actions}>
-                    <Text style={styles.acceptHint}>
-                      Accepting one reader finishes this swap for the book; other pending requests for it are declined
-                      automatically.
-                    </Text>
-                    <View style={styles.actionRow}>
-                      <Pressable
-                        style={[styles.actBtn, styles.accept]}
-                        onPress={() => void updateStatus(r._id, 'accepted')}
-                      >
-                        <Text style={styles.actAcceptTxt}>Accept</Text>
-                      </Pressable>
-                      <Pressable
-                        style={[styles.actBtn, styles.reject]}
-                        onPress={() => void updateStatus(r._id, 'rejected')}
-                      >
-                        <Text style={styles.actRejectTxt}>Reject</Text>
-                      </Pressable>
+                      </View>
+                      <View style={styles.compactBody}>
+                        <Text style={[styles.compactTitle, { fontFamily: font.bold }]} numberOfLines={2}>
+                          {r.bookTitle || 'Book'}
+                        </Text>
+                        <View style={styles.compactMetaRow}>
+                          <View style={styles.metaCluster}>
+                            <View style={[styles.metaIconBubble, styles.metaIconGreen]}>
+                              <Ionicons name="layers-outline" size={13} color={themeGreen} />
+                            </View>
+                            <Text style={[styles.metaTxt, { fontFamily: font.regular }]} numberOfLines={1}>
+                              {peerLabel}
+                            </Text>
+                          </View>
+                          <View style={[styles.metaCluster, styles.metaClusterRight]}>
+                            <View style={[styles.metaIconBubble, styles.metaIconPurple]}>
+                              <Ionicons name="time-outline" size={13} color={themePrimary} />
+                            </View>
+                            <Text style={[styles.metaTxt, { fontFamily: font.regular }]} numberOfLines={1}>
+                              {rel}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={styles.compactBottomRow}>
+                          <Text style={[styles.compactStatusAccent, { fontFamily: font.bold }]}>
+                            {capitalizeWord(r.status)}
+                          </Text>
+                          <View style={styles.compactTsCol}>
+                            <Text style={[styles.compactTime, { fontFamily: font.regular }]}>{ts.time || '—'}</Text>
+                            {ts.date ? (
+                              <Text style={[styles.compactDate, { fontFamily: font.regular }]}>{ts.date}</Text>
+                            ) : null}
+                          </View>
+                        </View>
+                      </View>
                     </View>
-                  </View>
-                ) : null}
-                {tab === 'received' && r.status === 'accepted' && r.hasReportFromRequester ? (
-                  <View style={styles.reportNotice}>
-                    <View style={styles.reportNoticeTop}>
-                      <Ionicons name="alert-circle-outline" size={16} color="#8b2500" />
-                      <Text style={styles.reportNoticeTxt}>
-                        The requester reported an issue for this exchange.
-                      </Text>
-                    </View>
-                    {r.requesterReportId ? (
-                      <Pressable
-                        style={styles.viewReportBtn}
-                        onPress={() =>
-                          navigation.navigate('ReportExchange', {
-                            exchangeRequestId: r._id,
-                            bookTitle: r.bookTitle || 'Book',
-                            reportId: r.requesterReportId,
-                            listerView: true,
-                            readerName: r.requesterDisplayName || 'Reader',
-                            readerAvatarUrl: r.requesterAvatarUrl || '',
-                          })
-                        }
-                      >
-                        <Text style={styles.viewReportTxt}>View report</Text>
-                        <Ionicons name="chevron-forward" size={18} color="#8b2500" />
-                      </Pressable>
-                    ) : null}
-                  </View>
-                ) : null}
-                <Pressable
-                  style={styles.chatBtn}
-                  onPress={() =>
-                    navigation.navigate('RequestChat', {
-                      requestId: r._id,
-                      bookTitle: r.bookTitle || 'Book',
-                      peerName:
-                        tab === 'received'
-                          ? r.requesterDisplayName || 'Reader'
-                          : r.ownerDisplayName || 'Book lister',
-                      peerAvatarUrl:
-                        tab === 'received'
-                          ? r.requesterAvatarUrl || ''
-                          : r.ownerAvatarUrl || '',
-                    })
-                  }
-                >
-                  <Text style={styles.chatTxt}>{tab === 'sent' ? 'Chat with lister' : 'Open chat'}</Text>
-                </Pressable>
-              </View>
-            ))
-          )}
-        </ScrollView>
-      )}
-
-      <Modal visible={editOpen} animationType="slide" transparent onRequestClose={closeEdit}>
-        <View style={styles.modalRoot}>
-          <Pressable style={styles.modalBackdrop} onPress={closeEdit} />
-          <View style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-            <Text style={styles.modalTitle}>Edit request</Text>
-            <Text style={styles.modalSub}>For: {editBookTitle}</Text>
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              style={{ maxHeight: 420 }}
-              contentContainerStyle={{ gap: FORM_SCROLL_GAP, paddingBottom: 8 }}
-            >
-              <View style={{ gap: 6 }}>
-                <Text style={styles.modalFieldLabel}>Message to the owner</Text>
-                <TextInput
-                  value={editMessage}
-                  onChangeText={setEditMessage}
-                  placeholder='e.g. "I can offer Physics past papers in good condition"'
-                  placeholderTextColor={warmHaze}
-                  style={styles.modalInput}
-                  multiline
-                  textAlignVertical="top"
-                  numberOfLines={5}
-                />
-              </View>
-              <View style={{ gap: 6 }}>
-                <Text style={styles.modalFieldLabel}>Offered book photo</Text>
-                <FormImageAttachment
-                  previewUri={editPhotoLocalUri || editPhotoUrl}
-                  onPick={pickEditPhoto}
-                  onRemove={removeEditPhoto}
-                  emptyHint="Tap to add photo of book you offer (optional)"
-                />
-              </View>
-            </ScrollView>
-            <View style={styles.modalActionsRow}>
-              <Pressable style={styles.modalBackBtn} onPress={closeEdit} disabled={editBusy}>
-                <Text style={styles.modalBackBtnTxt}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.modalConfirmBtn, editBusy && styles.modalConfirmBtnOff]}
-                onPress={() => void saveEdit()}
-                disabled={editBusy}
-              >
-                {editBusy ? (
-                  <ActivityIndicator color={cascadingWhite} size="small" />
-                ) : (
-                  <Text style={styles.modalConfirmBtnTxt}>Save changes</Text>
-                )}
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
-  );
-}
-
-function statusStyle(s: ExchangeRequest['status']) {
-  if (s === 'pending') return { backgroundColor: '#faeeda', color: '#854f0b' };
-  if (s === 'accepted') return { backgroundColor: '#eaf3de', color: '#27500a' };
-  if (s === 'cancelled') return { backgroundColor: '#f3f3f5', color: warmHaze };
-  return { backgroundColor: chineseSilver, color: lead };
-}
-
-function initialsFromName(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
-  if (parts.length === 0) return 'R';
-  return parts.map((p) => p[0]?.toUpperCase() ?? '').join('') || 'R';
-}
-
-function Avatar({ name, uri }: { name: string; uri?: string }) {
-  if (uri) {
-    return <Image source={{ uri }} style={styles.avatar} />;
-  }
-  return (
-    <View style={[styles.avatar, styles.avatarFallback]}>
-      <Text style={styles.avatarTxt}>{initialsFromName(name)}</Text>
-    </View>
+                  </Pressable>
+                );
+              })
+            )}
+          </ScrollView>
+        )}
+      </View>
+    </CourseScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: cascadingWhite, paddingHorizontal: 20, paddingBottom: 24 },
-  scroll: { paddingHorizontal: 20, paddingBottom: 32 },
-  headRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
-  chatsPill: {
+  signedInBody: { flex: 1 },
+  headerChatsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
+    paddingVertical: 8,
     paddingHorizontal: 12,
-    paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: chineseSilver,
+    backgroundColor: 'rgba(255,255,255,0.22)',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-    marginTop: 2,
+    borderColor: 'rgba(255,255,255,0.4)',
+    marginBottom: 2,
   },
-  chatsPillTxt: { fontSize: 14, fontWeight: '800', color: lead },
-  title: { fontSize: 28, fontWeight: '800', color: lead, letterSpacing: -0.5 },
-  subtitle: { marginTop: 4, fontSize: 15, color: warmHaze, fontWeight: '600', maxWidth: '88%' },
-  tabs: {
+  headerChatsTxt: { fontSize: 14, fontWeight: '800', color: cascadingWhite },
+  tabsPill: {
     flexDirection: 'row',
-    marginTop: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: dreamland,
+    backgroundColor: themeSurfaceMuted,
+    borderRadius: 14,
+    padding: 4,
+    gap: 4,
+    marginBottom: 4,
   },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  tabOn: { borderBottomWidth: 2, borderBottomColor: crunch },
-  tabText: { fontSize: 15, fontWeight: '600', color: warmHaze },
-  tabTextOn: { color: lead, fontWeight: '800' },
-  list: { paddingBottom: 32, gap: 12, marginTop: 14 },
+  tabPill: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  tabPillOn: { backgroundColor: themePrimary },
+  tabPillTxt: { fontSize: 14, fontWeight: '700', color: textSecondary },
+  tabPillTxtOn: { color: cascadingWhite, fontWeight: '800' },
+  list: { paddingBottom: Math.max(32, 12), gap: 14, marginTop: 14, flexGrow: 1 },
   card: {
     marginTop: 4,
     backgroundColor: cascadingWhite,
     borderRadius: 24,
     padding: 20,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
+    borderColor: REQ_BORDER,
   },
-  body: { fontSize: 15, lineHeight: 22, color: textSecondary },
-  error: { color: '#b3261e', marginTop: 12 },
-  reqCard: {
+  body: { fontSize: 15, lineHeight: 22, color: REQ_SUBTEXT },
+  error: { color: themeOrange, marginTop: 12 },
+  compactCard: {
     borderRadius: 20,
-    padding: 16,
+    padding: 14,
     backgroundColor: cascadingWhite,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-    gap: 10,
+    borderColor: REQ_BORDER,
   },
-  reqTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },
-  rightTop: { alignItems: 'flex-end', gap: 6 },
-  deleteBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#f0cccc',
-    backgroundColor: '#fff7f7',
+  compactPressed: { opacity: 0.94 },
+  compactRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 14,
   },
-  personRow: { flexDirection: 'row', gap: 10, alignItems: 'center', flex: 1 },
-  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: chineseSilver },
-  avatarFallback: { alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth, borderColor: dreamland },
-  avatarTxt: { fontSize: 14, fontWeight: '800', color: lead },
-  reqName: { fontSize: 17, fontWeight: '800', color: lead },
-  reqBook: { marginTop: 2, fontSize: 14, color: textSecondary },
-  status: {
-    fontSize: 12,
-    fontWeight: '800',
-    textTransform: 'capitalize',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
+  compactThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: 16,
     overflow: 'hidden',
+    backgroundColor: REQ_PURPLE_FILL,
+    flexShrink: 0,
   },
-  msg: {
-    marginTop: 4,
-    paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: dreamland,
-    fontSize: 14,
-    color: textSecondary,
-    lineHeight: 20,
-  },
-  actions: { gap: 10, marginTop: 4 },
-  acceptHint: { fontSize: 12, color: warmHaze, lineHeight: 17, marginBottom: 2 },
-  actionRow: { flexDirection: 'row', gap: 10 },
-  actBtn: { flex: 1, borderRadius: 14, paddingVertical: 12, alignItems: 'center', borderWidth: StyleSheet.hairlineWidth },
-  accept: { backgroundColor: '#eaf3de', borderColor: '#c0dd97' },
-  reject: { backgroundColor: cascadingWhite, borderColor: dreamland },
-  actAcceptTxt: { fontSize: 15, fontWeight: '800', color: '#27500a' },
-  actRejectTxt: { fontSize: 15, fontWeight: '700', color: textSecondary },
-  chatBtn: {
-    marginTop: 4,
-    borderRadius: 12,
-    paddingVertical: 11,
-    alignItems: 'center',
-    backgroundColor: '#f3f3f5',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-  },
-  chatTxt: { fontSize: 14, fontWeight: '700', color: lead },
-  offered: { width: '100%', height: 140, borderRadius: 12, marginTop: 4, backgroundColor: chineseSilver },
-  receiptPromptBlock: { marginTop: 4, gap: 6 },
-  preConfirmRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4, alignItems: 'stretch' },
-  reviewBtn: {
-    borderRadius: 14,
-    paddingVertical: 12,
+  compactThumbImg: { width: '100%', height: '100%' },
+  compactThumbPh: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: crunch,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-    alignSelf: 'stretch',
+    backgroundColor: REQ_PURPLE_FILL,
   },
-  confirmBtnHalf: {
+  compactBody: {
     flex: 1,
-    minWidth: '42%',
+    minWidth: 0,
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 2,
+  },
+  compactTitle: {
+    fontSize: 16,
+    color: themeInk,
+    lineHeight: 22,
+    letterSpacing: -0.3,
+  },
+  compactMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: 14,
-    paddingVertical: 12,
-    backgroundColor: '#eaf3de',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#c0dd97',
-  },
-  reportBtnHalf: {
-    flex: 1,
-    minWidth: '42%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: 14,
-    paddingVertical: 12,
-    backgroundColor: '#fff5f0',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#e8c4b8',
-  },
-  reportBlockedBlock: { gap: 10, marginTop: 2 },
-  reportBlockedTxt: { fontSize: 13, color: textSecondary, lineHeight: 18 },
-  reportEditFullWidth: {
-    borderRadius: 14,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f3f3f5',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-    alignSelf: 'stretch',
-  },
-  reportEditTxt: { fontSize: 14, fontWeight: '800', color: lead },
-  reportTxt: { fontSize: 14, fontWeight: '800', color: '#8b2500' },
-  reportNotice: {
-    marginTop: 4,
+    justifyContent: 'space-between',
     gap: 10,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: '#fff5f0',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#e8c4b8',
   },
-  reportNoticeTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  reportNoticeTxt: { flex: 1, fontSize: 13, fontWeight: '700', color: '#8b2500' },
-  viewReportBtn: {
+  metaCluster: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 6,
-    alignSelf: 'stretch',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: cascadingWhite,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#e8c4b8',
+    flex: 1,
+    minWidth: 0,
   },
-  viewReportTxt: { fontSize: 13, fontWeight: '800', color: '#8b2500' },
-  reviewTxt: { fontSize: 14, fontWeight: '800', color: lead },
-  reviewDone: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: textSecondary,
+  metaClusterRight: {
+    flex: 0,
+    flexShrink: 0,
+    maxWidth: '48%',
   },
-  confirmHint: { fontSize: 13, color: textSecondary, lineHeight: 18 },
-  confirmTxt: { fontSize: 14, fontWeight: '800', color: '#27500a' },
-  confirmedDone: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#27500a',
-  },
-  rightBtnRow: { flexDirection: 'row', gap: 6, alignItems: 'center' },
-  editBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  metaIconBubble: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-    backgroundColor: cascadingWhite,
   },
-  modalRoot: { flex: 1, justifyContent: 'flex-end' },
-  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)' },
-  modalSheet: {
-    backgroundColor: cascadingWhite,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    maxHeight: '90%',
+  metaIconGreen: { backgroundColor: 'rgba(56,163,54,0.18)' },
+  metaIconPurple: { backgroundColor: 'rgba(113,110,255,0.18)' },
+  metaTxt: {
+    flexShrink: 1,
+    fontSize: 12,
+    color: REQ_SUBTEXT,
+    lineHeight: 16,
   },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: lead },
-  modalSub: { marginTop: 2, marginBottom: 12, fontSize: 14, color: textSecondary },
-  modalFieldLabel: { fontSize: 13, fontWeight: '800', color: warmHaze },
-  modalInput: {
-    minHeight: 110,
-    backgroundColor: '#f3f3f5',
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+  compactBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 2,
+  },
+  compactStatusAccent: {
     fontSize: 15,
-    color: lead,
-    marginBottom: 2,
+    color: themePrimary,
+    letterSpacing: -0.2,
   },
-  modalActionsRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  modalBackBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-    backgroundColor: cascadingWhite,
+  compactTsCol: { alignItems: 'flex-end' },
+  compactTime: {
+    fontSize: 12,
+    color: REQ_SUBTEXT,
   },
-  modalBackBtnTxt: { fontSize: 15, fontWeight: '800', color: lead },
-  modalConfirmBtn: {
-    flex: 2,
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: 'center',
-    backgroundColor: lead,
+  compactDate: {
+    marginTop: 3,
+    fontSize: 11,
+    color: REQ_SUBTEXT,
   },
-  modalConfirmBtnOff: { opacity: 0.7 },
-  modalConfirmBtnTxt: { fontSize: 15, fontWeight: '800', color: cascadingWhite },
 });

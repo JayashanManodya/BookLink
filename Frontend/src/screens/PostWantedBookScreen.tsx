@@ -9,14 +9,7 @@ import { api, apiErrorMessage } from '../lib/api';
 import { alertOk } from '../lib/platformAlert';
 import type { WishlistStackParamList } from '../navigation/wishlistStackTypes';
 import type { WishlistItem } from '../types/wishlist';
-import {
-  cascadingWhite,
-  crunch,
-  dreamland,
-  lead,
-  textSecondary,
-  warmHaze,
-} from '../theme/colors';
+import { cascadingWhite, dreamland, lead, textSecondary, warmHaze, themePageBg, themePrimary, themeSurfaceMuted } from '../theme/colors';
 import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { cardShadow } from '../theme/shadows';
 
@@ -161,7 +154,7 @@ export function PostWantedBookScreen({ navigation, route }: Props) {
           <Text style={styles.screenTitle}>Edit wanted</Text>
           <View style={{ width: 72 }} />
         </View>
-        <ActivityIndicator style={{ marginTop: 40 }} color={crunch} />
+        <ActivityIndicator style={{ marginTop: 40 }} color={themePrimary} />
       </View>
     );
   }
@@ -265,7 +258,7 @@ function Field({
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: cascadingWhite },
+  flex: { flex: 1, backgroundColor: themePageBg },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -280,7 +273,7 @@ const styles = StyleSheet.create({
   hint: { fontSize: 14, color: textSecondary, lineHeight: 20 },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
   input: {
-    backgroundColor: '#f3f3f5',
+    backgroundColor: themeSurfaceMuted,
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
@@ -300,12 +293,12 @@ const styles = StyleSheet.create({
     borderColor: dreamland,
     backgroundColor: cascadingWhite,
   },
-  chipOn: { backgroundColor: crunch, borderColor: crunch },
+  chipOn: { backgroundColor: themePrimary, borderColor: themePrimary },
   chipTxt: { fontSize: 14, fontWeight: '700', color: textSecondary, textTransform: 'capitalize' },
-  chipTxtOn: { color: lead },
+  chipTxtOn: { color: cascadingWhite },
   submit: {
     marginTop: 12,
-    backgroundColor: crunch,
+    backgroundColor: themePrimary,
     borderRadius: 20,
     paddingVertical: 16,
     alignItems: 'center',

@@ -40,6 +40,23 @@ export function formatChatListDate(iso: string) {
   }
 }
 
+/** Lightweight course-style inbox timestamps (e.g. "8 hours ago") */
+export function formatChatListRelative(iso: string): string {
+  try {
+    const d = new Date(iso);
+    let diffMs = Date.now() - d.getTime();
+    if (diffMs < 0) diffMs = 0;
+    const min = Math.floor(diffMs / 60000);
+    const hr = Math.floor(min / 60);
+    if (min < 1) return 'Just now';
+    if (min < 60) return `${min} min ago`;
+    if (hr < 24) return `${hr} hour${hr === 1 ? '' : 's'} ago`;
+    return formatChatListDate(iso);
+  } catch {
+    return '';
+  }
+}
+
 type Props = {
   title: string;
   preview: string;
@@ -52,6 +69,8 @@ type Props = {
   onPress: () => void;
   /** Short context after preview, e.g. book title (muted) */
   contextHint?: string;
+  /** Course-style messenger inbox (flat white rows, relative time) */
+  variant?: 'default' | 'inbox';
 };
 
 export function ChatListRow({
@@ -65,31 +84,38 @@ export function ChatListRow({
   fallbackLetter,
   onPress,
   contextHint,
+  variant = 'default',
 }: Props) {
   const { prefix, body } = previewParts(myUserId, lastMessageSenderClerkUserId, peerNameForPrefix, preview);
-  const dateLabel = formatChatListDate(dateIso);
+  const dateLabel = variant === 'inbox' ? formatChatListRelative(dateIso) : formatChatListDate(dateIso);
 
   return (
-    <Pressable style={styles.row} onPress={onPress} android_ripple={{ color: chineseSilver }}>
+    <Pressable
+      style={[styles.row, variant === 'inbox' && styles.rowInbox]}
+      onPress={onPress}
+      android_ripple={{ color: chineseSilver }}
+    >
       {imageUrl ? (
-        <Image source={{ uri: imageUrl }} style={styles.avatar} />
+        <Image source={{ uri: imageUrl }} style={[styles.avatar, variant === 'inbox' && styles.avatarInbox]} />
       ) : (
-        <View style={[styles.avatar, styles.avatarPh]}>
+        <View style={[styles.avatar, styles.avatarPh, variant === 'inbox' && styles.avatarInbox]}>
           <Text style={styles.avatarLetter}>{fallbackLetter.slice(0, 1).toUpperCase()}</Text>
         </View>
       )}
       <View style={styles.body}>
         <View style={styles.titleRow}>
-          <Text style={styles.title} numberOfLines={1}>
+          <Text style={[styles.title, variant === 'inbox' && styles.titleInbox]} numberOfLines={1}>
             {title}
           </Text>
-          <Text style={styles.date}>{dateLabel}</Text>
+          <Text style={[styles.date, variant === 'inbox' && styles.dateInbox]}>{dateLabel}</Text>
         </View>
-        <Text style={styles.preview} numberOfLines={2}>
-          {prefix ? <Text style={styles.previewStrong}>{prefix}</Text> : null}
+        <Text style={[styles.preview, variant === 'inbox' && styles.previewInbox]} numberOfLines={variant === 'inbox' ? 1 : 2}>
+          {prefix ? (
+            <Text style={[styles.previewStrong, variant === 'inbox' && styles.previewStrongInbox]}>{prefix}</Text>
+          ) : null}
           {body}
           {contextHint ? (
-            <Text style={styles.previewHint}>
+            <Text style={[styles.previewHint, variant === 'inbox' && styles.previewHintInbox]}>
               {' '}
               · {contextHint}
             </Text>
@@ -111,11 +137,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: chineseSilver,
   },
+  rowInbox: {
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 0,
+    backgroundColor: '#FFFFFF',
+    borderBottomColor: '#ECECEC',
+  },
   avatar: {
     width: 54,
     height: 54,
     borderRadius: 27,
     backgroundColor: chineseSilver,
+  },
+  avatarInbox: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
   },
   avatarPh: { alignItems: 'center', justifyContent: 'center' },
   avatarLetter: { fontSize: 20, fontWeight: '700', color: lead },
@@ -133,11 +171,21 @@ const styles = StyleSheet.create({
     color: lead,
     letterSpacing: -0.2,
   },
+  titleInbox: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
   date: {
     fontSize: 13,
     fontWeight: '500',
     color: warmHaze,
     marginTop: 1,
+  },
+  dateInbox: {
+    fontSize: 12,
+    color: '#A0A0A0',
+    marginTop: 0,
+    fontVariant: ['tabular-nums'],
   },
   preview: {
     marginTop: 4,
@@ -145,6 +193,12 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: textSecondary,
     lineHeight: 20,
+  },
+  previewInbox: {
+    marginTop: 3,
+    fontSize: 14,
+    lineHeight: 19,
+    color: '#8E8E8E',
   },
   previewStrong: {
     fontSize: 15,
@@ -155,5 +209,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '400',
     color: warmHaze,
+  },
+  previewStrongInbox: {
+    fontSize: 14,
+    color: '#8E8E8E',
+  },
+  previewHintInbox: {
+    fontSize: 14,
+    color: '#B0B0B0',
   },
 });

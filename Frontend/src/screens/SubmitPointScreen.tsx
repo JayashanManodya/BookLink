@@ -19,14 +19,7 @@ import { LocationMapPicker } from '../components/LocationMapPicker';
 import { api, apiErrorMessage } from '../lib/api';
 import { alertOk } from '../lib/platformAlert';
 import type { ProfileStackParamList } from '../navigation/profileStackTypes';
-import {
-  cascadingWhite,
-  crunch,
-  dreamland,
-  lead,
-  textSecondary,
-  warmHaze,
-} from '../theme/colors';
+import { cascadingWhite, dreamland, lead, textSecondary, warmHaze, themePageBg, themePrimary, themeSurfaceMuted } from '../theme/colors';
 import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { cardShadow } from '../theme/shadows';
 import type { CollectionPoint } from '../types/point';
@@ -172,7 +165,7 @@ export function SubmitPointScreen({ navigation, route }: Props) {
   if (loading) {
     return (
       <View style={[styles.flex, styles.center]}>
-        <ActivityIndicator color={crunch} />
+        <ActivityIndicator color={themePrimary} />
       </View>
     );
   }
@@ -260,7 +253,7 @@ function Field({
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: cascadingWhite },
+  flex: { flex: 1, backgroundColor: themePageBg },
   center: { alignItems: 'center', justifyContent: 'center' },
   topBar: { paddingHorizontal: 12, paddingBottom: 4 },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
@@ -272,7 +265,7 @@ const styles = StyleSheet.create({
   detailsTitle: { fontSize: 15, fontWeight: '800', color: lead, marginTop: 8 },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
   input: {
-    backgroundColor: '#f3f3f5',
+    backgroundColor: themeSurfaceMuted,
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
@@ -284,7 +277,7 @@ const styles = StyleSheet.create({
   inputMultiline: { minHeight: 72, textAlignVertical: 'top', marginBottom: 2 },
   submit: {
     marginTop: 8,
-    backgroundColor: crunch,
+    backgroundColor: themePrimary,
     borderRadius: 20,
     paddingVertical: 16,
     alignItems: 'center',

@@ -1,4 +1,4 @@
-﻿{
+{
   "expo": {
     "name": "BookLink",
     "slug": "booklink",
@@ -20,7 +20,8 @@
           "photosPermission": "Allow BookLink to choose a cover photo for your listing.",
           "cameraPermission": "Allow BookLink to take a photo for your book cover."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "ios": {
       "bundleIdentifier": "lk.booklink.app",

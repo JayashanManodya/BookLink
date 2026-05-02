@@ -57,6 +57,7 @@ function serializeRequest(doc, bookLean, profileById = {}, extra = {}) {
     _id: String(o._id),
     bookId: String(o.bookId),
     bookTitle: bookLean?.title ?? '',
+    bookCoverImageUrl: bookLean?.coverImageUrl || '',
     requesterClerkUserId: o.requesterClerkUserId,
     ownerClerkUserId: o.ownerClerkUserId,
     requesterDisplayName: requesterProfile.displayName || o.requesterDisplayName || 'Reader',

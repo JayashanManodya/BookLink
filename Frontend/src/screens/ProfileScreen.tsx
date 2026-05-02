@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Image,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -13,16 +12,16 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '@clerk/clerk-expo';
 import { SignInGateCard } from '../components/SignInGateCard';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../lib/api';
 import type { ProfileStackParamList } from '../navigation/profileStackTypes';
+import { CourseScreenShell } from '../components/CourseScreenShell';
 import {
   cascadingWhite,
   chineseSilver,
-  crunch,
   dreamland,
   lead,
   warmHaze,
+  themePrimary,
 } from '../theme/colors';
 import { cardShadow } from '../theme/shadows';
 
@@ -52,7 +51,6 @@ type RatingSummary = {
 };
 
 export function ProfileScreen() {
-  const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const { isSignedIn, signOut, userId } = useAuth();
   const [me, setMe] = useState<Me | null>(null);
@@ -127,37 +125,23 @@ export function ProfileScreen() {
 
   if (!isSignedIn) {
     return (
-      <ScrollView
-        style={styles.flex}
-        contentContainerStyle={[styles.scroll, styles.gateScroll, { paddingTop: Math.max(insets.top, 8) + 8 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.headerTitle}>Profile</Text>
-        <Text style={styles.gateSubtitle}>Sign in to see your account and settings.</Text>
+      <CourseScreenShell title="Profile" subtitle="Sign in to see your account and settings." scroll scrollContentStyle={{ gap: 16 }}>
         <SignInGateCard
           title="You’re signed out"
           message="Use Google to sign in and manage your BookLink profile, listings, and swaps."
           icon="person-outline"
         />
-      </ScrollView>
+      </CourseScreenShell>
     );
   }
 
   const tabs = navigation.getParent();
 
   return (
-    <ScrollView
-      style={styles.flex}
-      contentContainerStyle={[styles.scroll, { paddingTop: Math.max(insets.top, 8) + 8 }]}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.headerRow}>
-        <Text style={styles.headerTitle}>Profile</Text>
-      </View>
-
+    <CourseScreenShell title="Profile" subtitle="Your account & activity" scroll scrollContentStyle={{ gap: 16 }}>
       <View style={[styles.identityCard, cardShadow]}>
         {loading ? (
-          <ActivityIndicator color={crunch} />
+          <ActivityIndicator color={themePrimary} />
         ) : error ? (
           <Text style={styles.error}>{error}</Text>
         ) : (
@@ -250,22 +234,11 @@ export function ProfileScreen() {
       <Pressable onPress={() => signOut()} style={[styles.signOutBtn, cardShadow]}>
         <Text style={styles.signOutText}>Sign out</Text>
       </Pressable>
-    </ScrollView>
+    </CourseScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: cascadingWhite },
-  scroll: { paddingHorizontal: 20, paddingBottom: 32, gap: 16 },
-  gateScroll: { flexGrow: 1 },
-  gateSubtitle: { marginTop: 6, fontSize: 15, color: warmHaze, fontWeight: '600' },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: lead },
   identityCard: {
     backgroundColor: cascadingWhite,
     borderRadius: 24,
@@ -273,7 +246,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
-    marginTop: 8,
+    marginTop: 0,
   },
   avatar: { width: 88, height: 88, borderRadius: 44, marginBottom: 12 },
   avatarPlaceholder: {
@@ -325,7 +298,7 @@ const styles = StyleSheet.create({
   menuLabel: { fontSize: 16, fontWeight: '600', color: lead },
   chevron: { fontSize: 15, color: warmHaze, fontWeight: '700' },
   signOutBtn: {
-    backgroundColor: lead,
+    backgroundColor: themePrimary,
     borderRadius: 20,
     paddingVertical: 16,
     alignItems: 'center',

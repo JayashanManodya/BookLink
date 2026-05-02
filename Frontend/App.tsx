@@ -1,33 +1,57 @@
 import 'react-native-gesture-handler';
 import * as WebBrowser from 'expo-web-browser';
-import { StatusBar } from 'expo-status-bar';
+import { useEffect, type ReactNode } from 'react';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  Inter_800ExtraBold,
+  useFonts,
+} from '@expo-google-fonts/inter';
+import { Caveat_700Bold } from '@expo-google-fonts/caveat';
+import * as SplashScreen from 'expo-splash-screen';
 import { ClerkProvider } from '@clerk/clerk-expo';
 import { tokenCache } from '@clerk/clerk-expo/token-cache';
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { MainTabs } from './src/navigation/MainTabs';
+import { RootGate } from './src/navigation/RootGate';
 import { cascadingWhite, lead } from './src/theme/colors';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
+void SplashScreen.preventAutoHideAsync().catch(() => {});
 
-const navTheme = {
-  ...DefaultTheme,
-  colors: { ...DefaultTheme.colors, background: cascadingWhite },
-};
+function InterFontGate({ children }: { children: ReactNode }) {
+  const [loaded] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    Inter_800ExtraBold,
+    Caveat_700Bold,
+  });
+  useEffect(() => {
+    if (loaded) void SplashScreen.hideAsync();
+  }, [loaded]);
+  if (!loaded) return null;
+  return children;
+}
+
+const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 
 export default function App() {
   if (!publishableKey) {
     return (
-      <View style={styles.missing}>
-        <Text style={styles.missingTitle}>Missing Clerk key</Text>
-        <Text style={styles.missingBody}>
-          Add EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY to Frontend/.env and restart Expo.
-        </Text>
-      </View>
+      <InterFontGate>
+        <View style={styles.missing}>
+          <Text style={styles.missingTitle}>Missing Clerk key</Text>
+          <Text style={styles.missingBody}>
+            Add EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY to Frontend/.env and restart Expo.
+          </Text>
+        </View>
+      </InterFontGate>
     );
   }
 
@@ -35,10 +59,9 @@ export default function App() {
     <GestureHandlerRootView style={styles.flex}>
       <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
         <SafeAreaProvider>
-          <NavigationContainer theme={navTheme}>
-            <StatusBar style="dark" />
-            <MainTabs />
-          </NavigationContainer>
+          <InterFontGate>
+            <RootGate />
+          </InterFontGate>
         </SafeAreaProvider>
       </ClerkProvider>
     </GestureHandlerRootView>

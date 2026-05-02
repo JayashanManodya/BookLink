@@ -6,11 +6,16 @@ import { RequestExchangeScreen } from '../screens/RequestExchangeScreen';
 import { UserReviewsScreen } from '../screens/UserReviewsScreen';
 import type { BrowseStackParamList } from './browseStackTypes';
 
+import { themePageBg } from '../theme/courseTheme';
+
 const Stack = createNativeStackNavigator<BrowseStackParamList>();
 
 export function BrowseStack() {
   return (
-    <Stack.Navigator id="BrowseStackRoot" screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      id="BrowseStackRoot"
+      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: themePageBg } }}
+    >
       <Stack.Screen name="BrowseList" component={BrowseListScreen} />
       <Stack.Screen name="BookDetail" component={BookDetailScreen} />
       <Stack.Screen name="AddBook" component={AddBookScreen} />

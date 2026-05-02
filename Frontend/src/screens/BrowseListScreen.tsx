@@ -1,37 +1,98 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
+  type ImageStyle,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
+import { useAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useUser } from '@clerk/clerk-expo';
 import { api } from '../lib/api';
 import type { BrowseStackParamList } from '../navigation/browseStackTypes';
-import { cascadingWhite, chineseSilver, crunch, dreamland, lead, textSecondary, warmHaze } from '../theme/colors';
+import {
+  cascadingWhite,
+  chineseSilver,
+  dreamland,
+} from '../theme/colors';
+import {
+  themeCard,
+  themeGreen,
+  themeIllustrationBlue,
+  themeInk,
+  themeMuted,
+  themeOrange,
+  themePageBg,
+  themePrimary,
+} from '../theme/courseTheme';
 import { cardShadow } from '../theme/shadows';
+import { font, fontHandwriting } from '../theme/typography';
 import type { Book } from '../types/book';
+import type { WishlistItem } from '../types/wishlist';
 import { BOOK_TYPES } from '../constants/bookTypes';
 
-const QUICK_TYPE_CHIPS = BOOK_TYPES.slice(0, 8);
+const WANTED_SECTION_LIMIT = 12;
+
+const HERO_BOTTOM_RADIUS = 44;
+/**
+ * Pulls the featured card up onto the rounded purple footer only — must stay *less* than
+ * the header's bottom padding + search row height, or the card (painted above the hero in
+ * scroll order) covers the search + filter.
+ */
+const FEATURE_OVERLAP_UP = 46;
+/** Extra vertical space between the search row and the top of the Latest card (positive = more gap). */
+const GAP_SEARCH_TO_FEATURE_CARD = 18;
 
 const CONDITIONS = ['new', 'good', 'poor'] as const;
 
 const SEARCH_DEBOUNCE_MS = 380;
 
+const SCREEN_W = Dimensions.get('window').width;
+const WANTED_GRID_GAP = 12;
+const WANTED_CARD_W = (SCREEN_W - 40 - WANTED_GRID_GAP) / 2;
+const CARD_W = Math.min(176, Math.max(152, SCREEN_W * 0.42));
+
+const LATEST_CARD_COUNT = 3;
+const LATEST_CARD_W = SCREEN_W - 40;
+const LATEST_CARD_GAP = 14;
+
 function normalizeConditionLabel(value?: string) {
-  if (!value) return '';
   const c = value.toLowerCase().trim();
   return c === 'fair' ? 'poor' : c;
+}
+
+function listerInitials(book: Pick<Book, 'ownerDisplayName' | 'author'>) {
+  const name = book.ownerDisplayName?.trim() || book.author?.trim() || 'Reader';
+  const parts = name.split(/\s+/).filter(Boolean).slice(0, 2);
+  if (!parts.length) return '?';
+  return parts.map((p) => p[0]?.toUpperCase() ?? '').join('') || '?';
+}
+
+function relativeListingAge(iso?: string): string {
+  if (!iso) return 'Recently';
+  try {
+    const d = new Date(iso);
+    const diffMs = Date.now() - d.getTime();
+    if (diffMs < 0) return 'Recently';
+    const days = Math.floor(diffMs / 86400000);
+    if (days < 1) return 'Today';
+    if (days === 1) return '1 day';
+    if (days < 7) return `${days} days`;
+    if (days < 30) return `${Math.floor(days / 7)} wk`;
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  } catch {
+    return 'Recently';
+  }
 }
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'BrowseList'>;
@@ -45,20 +106,11 @@ type ListParams = {
   yearMax?: number;
 };
 
+type OwnerReviewSummary = { averageRating: number | null; reviewCount: number };
+
 export function BrowseListScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { user } = useUser();
-  const greetingName = useMemo(() => {
-    const first = user?.firstName?.trim();
-    if (first) return first;
-    const full = user?.fullName?.trim();
-    if (full) return full.split(/\s+/)[0] ?? full;
-    const uname = user?.username?.trim();
-    if (uname) return uname;
-    const email = user?.primaryEmailAddress?.emailAddress;
-    if (email) return email.split('@')[0] ?? 'Reader';
-    return 'Reader';
-  }, [user]);
+  const { isSignedIn } = useAuth();
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +123,9 @@ export function BrowseListScreen({ navigation }: Props) {
   const [advLanguage, setAdvLanguage] = useState('');
   const [advYearMin, setAdvYearMin] = useState('');
   const [advYearMax, setAdvYearMax] = useState('');
+  const [wantedItems, setWantedItems] = useState<WishlistItem[]>([]);
+  const [wantedLoading, setWantedLoading] = useState(false);
+  const [ownerReviewsById, setOwnerReviewsById] = useState<Record<string, OwnerReviewSummary>>({});
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
@@ -93,12 +148,13 @@ export function BrowseListScreen({ navigation }: Props) {
 
   const advancedActiveCount = useMemo(() => {
     let n = 0;
+    if (bookTypeChip) n += 1;
     if (advCondition) n += 1;
     if (advLanguage.trim()) n += 1;
     if (advYearMin.trim()) n += 1;
     if (advYearMax.trim()) n += 1;
     return n;
-  }, [advCondition, advLanguage, advYearMin, advYearMax]);
+  }, [bookTypeChip, advCondition, advLanguage, advYearMin, advYearMax]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -114,17 +170,66 @@ export function BrowseListScreen({ navigation }: Props) {
     }
   }, [listParams]);
 
+  const loadWanted = useCallback(async () => {
+    setWantedLoading(true);
+    try {
+      const res = await api.get<{ items: WishlistItem[] }>('/api/wishlist');
+      const open = (res.data.items ?? []).filter((it) => it.status !== 'fulfilled');
+      setWantedItems(open.slice(0, WANTED_SECTION_LIMIT));
+    } catch {
+      setWantedItems([]);
+    } finally {
+      setWantedLoading(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       void load();
-    }, [load])
+      void loadWanted();
+    }, [load, loadWanted])
   );
+
+  useEffect(() => {
+    if (!isSignedIn || books.length === 0) {
+      setOwnerReviewsById({});
+      return;
+    }
+    const ids = [
+      ...new Set(books.map((b) => b.ownerClerkUserId).filter((id): id is string => Boolean(id))),
+    ];
+    let cancelled = false;
+    void (async () => {
+      const rows = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const res = await api.get<OwnerReviewSummary>(
+              `/api/reviews/user/${encodeURIComponent(id)}`
+            );
+            const averageRating =
+              typeof res.data.averageRating === 'number' ? res.data.averageRating : null;
+            const reviewCount =
+              typeof res.data.reviewCount === 'number' ? res.data.reviewCount : 0;
+            return [id, { averageRating, reviewCount }] as const;
+          } catch {
+            return [id, { averageRating: null, reviewCount: 0 }] as const;
+          }
+        })
+      );
+      if (cancelled) return;
+      setOwnerReviewsById(Object.fromEntries(rows));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [books, isSignedIn]);
 
   const clearQuickFilters = () => {
     setBookTypeChip(null);
   };
 
   const clearAdvanced = () => {
+    setBookTypeChip(null);
     setAdvCondition(null);
     setAdvLanguage('');
     setAdvYearMin('');
@@ -133,152 +238,379 @@ export function BrowseListScreen({ navigation }: Props) {
 
   const clearAllFilters = () => {
     setSearchInput('');
-    clearQuickFilters();
     clearAdvanced();
   };
 
-  const hasAnyFilter = !!debouncedSearch || !!bookTypeChip || advancedActiveCount > 0;
+  const hasAnyFilter = !!debouncedSearch || advancedActiveCount > 0;
+
+  const latestBooks = useMemo(() => {
+    if (loading || books.length === 0) return [] as Book[];
+    return books.slice(0, Math.min(LATEST_CARD_COUNT, books.length));
+  }, [loading, books]);
+
+  const openWantedBoard = () => {
+    navigation.getParent()?.navigate('Wishlist', {
+      screen: 'WishlistBoard',
+      params: { initialTab: 'community' },
+    });
+  };
+
+  const openWantedDetail = (wishlistItemId: string) => {
+    navigation.getParent()?.navigate('Wishlist', {
+      screen: 'WantedBookDetail',
+      params: { wishlistItemId },
+    });
+  };
+
+  const renderPopularCard = (b: Book) => {
+    const ownerId = b.ownerClerkUserId;
+    const rev = ownerId ? ownerReviewsById[ownerId] : undefined;
+    const listerLine = b.ownerDisplayName?.trim() || 'Community lister';
+    const listedLine = relativeListingAge(b.createdAt);
+    const authorLine = [b.author?.trim(), b.bookType].filter(Boolean).join(' · ');
+
+    return (
+    <Pressable
+      key={b._id}
+      onPress={() => navigation.navigate('BookDetail', { bookId: b._id })}
+      style={({ pressed }) => [styles.popCard, cardShadow, pressed && styles.cardPressed]}
+    >
+      <View style={styles.popImageWrap}>
+        {b.coverImageUrl ? (
+          <Image source={{ uri: b.coverImageUrl }} style={styles.popImage as ImageStyle} resizeMode="cover" />
+        ) : (
+          <View style={styles.popImageFallback}>
+            <Ionicons name="book-outline" size={38} color={themePrimary} />
+          </View>
+        )}
+      </View>
+      <View style={styles.popBody}>
+        <Text style={styles.popTitle} numberOfLines={2}>
+          {b.title}
+        </Text>
+        {authorLine ? (
+          <Text style={[styles.popAuthorLine, { fontFamily: font.regular }]} numberOfLines={1}>
+            {authorLine}
+          </Text>
+        ) : null}
+        <View style={styles.popListerRow}>
+          <Text style={[styles.popListerName, { fontFamily: font.semi }]} numberOfLines={1}>
+            {listerLine}
+          </Text>
+          <Text style={[styles.popListedDate, { fontFamily: font.regular }]}>{listedLine}</Text>
+        </View>
+        {isSignedIn && ownerId ? (
+          <View style={styles.popRatingRow}>
+            <Ionicons name="star" size={14} color={themeOrange} />
+            {rev === undefined ? (
+              <Text style={[styles.popReviewCount, { fontFamily: font.regular }]}>…</Text>
+            ) : rev.averageRating != null ? (
+              <>
+                <Text style={[styles.popRatingScore, { fontFamily: font.bold }]}>
+                  {rev.averageRating.toFixed(1)}
+                </Text>
+                {rev.reviewCount > 0 ? (
+                  <Text style={[styles.popReviewCount, { fontFamily: font.regular }]}>
+                    ({rev.reviewCount} review{rev.reviewCount === 1 ? '' : 's'})
+                  </Text>
+                ) : null}
+              </>
+            ) : (
+              <Text style={[styles.popReviewCount, { fontFamily: font.regular }]}>No reviews yet</Text>
+            )}
+          </View>
+        ) : null}
+        <View style={styles.popBadgeRow}>
+          {b.condition ? (
+            <View style={[styles.miniPill, styles.miniPillGreen]}>
+              <Ionicons name="layers-outline" size={12} color={themeGreen} />
+              <Text style={styles.miniPillTxt}>{normalizeConditionLabel(b.condition)}</Text>
+            </View>
+          ) : null}
+          {typeof b.year === 'number' ? (
+            <View style={[styles.miniPill, styles.miniPillLavender]}>
+              <Ionicons name="calendar-outline" size={12} color={themePrimary} />
+              <Text style={styles.miniPillTxt}>{b.year}</Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+    </Pressable>
+    );
+  };
+
+  const fontBase = useMemo(() => ({ fontFamily: font.regular }), []);
 
   return (
     <View style={styles.flex}>
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingTop: Math.max(insets.top, 8) + 8 }]}
+        style={styles.scrollRoot}
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.greetTitle} numberOfLines={1}>Hi, {greetingName}</Text>
-            <Text style={styles.greetSub}>Explore the world of books</Text>
-          </View>
-          <Pressable style={styles.avatarCircle} onPress={() => navigation.navigate('AddBook')} hitSlop={8}>
-            <Ionicons name="add" size={22} color={lead} />
-          </Pressable>
-        </View>
-
-        <View style={styles.searchRow}>
-          <View style={styles.searchWrap}>
-            <Ionicons name="search-outline" size={18} color={warmHaze} style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search books"
-              placeholderTextColor={warmHaze}
-              value={searchInput}
-              onChangeText={setSearchInput}
-              returnKeyType="search"
-            />
-          </View>
-          <Pressable
-            style={[styles.filterFab, advancedActiveCount > 0 && styles.filterFabOn]}
-            onPress={() => setAdvModalOpen(true)}
-            hitSlop={6}
-          >
-            <Ionicons name="options-outline" size={20} color={advancedActiveCount > 0 ? lead : textSecondary} />
-          </Pressable>
-        </View>
-
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionMainTitle}>Popular books</Text>
-          <Pressable onPress={() => void load()} hitSlop={8}>
-            <Text style={styles.viewAllTxt}>View all</Text>
-          </Pressable>
-        </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.segmentRow}>
-          <Pressable
-            onPress={clearQuickFilters}
-            style={[styles.segmentChip, !bookTypeChip && styles.segmentChipOn]}
-          >
-            <Text style={[styles.segmentTxt, !bookTypeChip && styles.segmentTxtOn]}>All</Text>
-          </Pressable>
-          {QUICK_TYPE_CHIPS.map((tab) => (
-            <Pressable
-              key={tab}
-              onPress={() => setBookTypeChip((prev) => (prev === tab ? null : tab))}
-              style={[styles.segmentChip, bookTypeChip === tab && styles.segmentChipOn]}
-            >
-              <Text style={[styles.segmentTxt, bookTypeChip === tab && styles.segmentTxtOn]}>{tab}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        {hasAnyFilter ? (
-          <Pressable onPress={clearAllFilters} style={styles.clearAllRow}>
-            <Text style={styles.clearAllTxt}>Clear all filters</Text>
-            <Ionicons name="close-circle-outline" size={18} color={crunch} />
-          </Pressable>
-        ) : null}
-
-        {loading ? (
-          <ActivityIndicator style={{ marginTop: 20 }} color={crunch} />
-        ) : error ? (
-          <Text style={styles.error}>{error}</Text>
-        ) : books.length === 0 ? (
-          <View style={[styles.emptyCard, cardShadow]}>
-            <Text style={styles.muted}>
-              {hasAnyFilter
-                ? 'No books match these filters. Try clearing some options or broadening your search.'
-                : 'No books yet. Be the first to list one from your shelf.'}
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.gridWrap}>
-            {books.map((b) => (
+        <View style={[styles.heroBlock, { paddingTop: Math.max(insets.top, 14) }]}>
+          <View style={styles.heroPad}>
+            <View style={styles.heroTopRow}>
               <Pressable
-                key={b._id}
-                onPress={() => navigation.navigate('BookDetail', { bookId: b._id })}
-                style={[styles.gridCard, cardShadow]}
+                accessibilityLabel="Open filters menu"
+                onPress={() => setAdvModalOpen(true)}
+                style={styles.heroIconBtn}
+                hitSlop={8}
               >
-                <View style={styles.featureImageWrap}>
-                  {b.coverImageUrl ? (
-                    <Image source={{ uri: b.coverImageUrl }} style={styles.featureImage} resizeMode="cover" />
-                  ) : (
-                    <View style={styles.coverFallback}>
-                      <Ionicons name="book-outline" size={32} color={lead} />
-                    </View>
-                  )}
-                </View>
-                <View style={styles.cardBody}>
-                  <Text style={styles.featureTitle} numberOfLines={1}>
-                    {b.title}
-                  </Text>
-                  <View style={styles.featureMetaRow}>
-                    <View style={styles.listerRow}>
-                      {b.ownerAvatarUrl ? (
-                        <Image source={{ uri: b.ownerAvatarUrl }} style={styles.listerAvatarImg} />
-                      ) : (
-                        <View style={styles.listerAvatar}>
-                          <Text style={styles.listerAvatarTxt}>
-                            {(b.ownerDisplayName || b.author || 'R').charAt(0).toUpperCase()}
-                          </Text>
-                        </View>
-                      )}
-                      <Text style={styles.featureSub} numberOfLines={1}>
-                        {b.author}
-                        {b.bookType ? ` · ${b.bookType}` : ''}
-                      </Text>
-                    </View>
-                    {b.condition ? (
-                      <Text
-                        style={[
-                          styles.conditionChipLarge,
-                          normalizeConditionLabel(b.condition) === 'new'
-                            ? styles.conditionChipNew
-                            : normalizeConditionLabel(b.condition) === 'good'
-                              ? styles.conditionChipGood
-                              : styles.conditionChipPoor,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {normalizeConditionLabel(b.condition)}
-                      </Text>
-                    ) : null}
-                  </View>
+                <Ionicons name="menu" size={22} color={cascadingWhite} />
+              </Pressable>
+              <Pressable accessibilityLabel="List a book" onPress={() => navigation.navigate('AddBook')} hitSlop={8}>
+                <View style={[styles.heroIconBtn, styles.heroIconBtnMuted]}>
+                  <Ionicons name="add" size={22} color={cascadingWhite} />
                 </View>
               </Pressable>
-            ))}
+              <View style={styles.heroTopSpacer} />
+              <View style={styles.notifWrap}>
+                <Pressable accessibilityLabel="Notifications" style={styles.heroIconBtn}>
+                  <Ionicons name="notifications-outline" size={22} color={cascadingWhite} />
+                </Pressable>
+                <View style={styles.notifDot} pointerEvents="none" />
+              </View>
+            </View>
+
+            <View style={styles.heroHeadingBlock}>
+              <Text
+                style={[styles.heroTaglineLine1, { fontFamily: fontHandwriting.caveatBold }]}
+                accessibilityRole="header"
+              >
+                Read it. Share it.
+              </Text>
+              <Text style={[styles.heroTaglineLine2, { fontFamily: fontHandwriting.caveatBold }]}>
+                Discover more.
+              </Text>
+            </View>
+
+            <View style={styles.searchRow}>
+              <View style={styles.searchGlass}>
+                <Ionicons name="search-outline" size={20} color="rgba(255,255,255,0.92)" />
+                <TextInput
+                  style={[styles.searchInput, { fontFamily: font.medium }]}
+                  placeholder="Search anything..."
+                  placeholderTextColor="rgba(255,255,255,0.65)"
+                  value={searchInput}
+                  onChangeText={setSearchInput}
+                  returnKeyType="search"
+                  selectionColor={cascadingWhite}
+                />
+              </View>
+              <Pressable
+                style={[styles.filterCircle, advancedActiveCount > 0 && styles.filterCircleOn]}
+                onPress={() => setAdvModalOpen(true)}
+                hitSlop={6}
+              >
+                <Ionicons name="options-outline" size={20} color={themePrimary} />
+              </Pressable>
+            </View>
           </View>
-        )}
+        </View>
+
+        <View style={[styles.bodyPad, latestBooks.length === 0 && styles.bodyPadNoFeature]}>
+          {latestBooks.length > 0 ? (
+            <ScrollView
+              horizontal
+              nestedScrollEnabled
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              decelerationRate="fast"
+              accessibilityLabel="Latest books, scroll sideways"
+              contentContainerStyle={styles.latestCarouselContent}
+              style={[styles.latestCarouselRow, styles.featureOverlap]}
+            >
+              {latestBooks.map((b) => (
+                <Pressable
+                  key={b._id}
+                  onPress={() => navigation.navigate('BookDetail', { bookId: b._id })}
+                  style={({ pressed }) => [
+                    styles.latestCard,
+                    cardShadow,
+                    pressed && styles.cardPressed,
+                  ]}
+                >
+                  <View style={styles.latestImageOuter}>
+                      {b.coverImageUrl ? (
+                        <Image
+                          source={{ uri: b.coverImageUrl }}
+                          style={styles.latestImage as ImageStyle}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={styles.latestImageFallback}>
+                          <Ionicons name="book-outline" size={42} color={themePrimary} />
+                        </View>
+                      )}
+                      <View style={[styles.liveBadge, { borderColor: themeCard }]}>
+                        <Text style={[styles.liveBadgeTxt, { fontFamily: font.bold }]}>Latest</Text>
+                      </View>
+                    </View>
+                    <View style={styles.featureOverlay}>
+                      <View style={styles.latestTextCol}>
+                        <Text style={[styles.featureCat, { fontFamily: font.bold }]} numberOfLines={2}>
+                          {b.title}
+                        </Text>
+                        <Text style={[styles.featureSubtitle, { fontFamily: font.regular }]} numberOfLines={1}>
+                          {b.bookType
+                            ? [b.bookType, b.author?.trim()].filter(Boolean).join(' · ')
+                            : b.author?.trim() || 'Community listing'}
+                        </Text>
+                      </View>
+                      <View style={styles.featureListerWrap}>
+                        {b.ownerAvatarUrl ? (
+                          <Image
+                            source={{ uri: b.ownerAvatarUrl }}
+                            style={styles.featureListerImg as ImageStyle}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <View style={[styles.featureListerImg, styles.featureListerFallback]}>
+                            <Text style={[styles.featureListerInitials, { fontFamily: font.bold }]}>
+                              {listerInitials(b)}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  </Pressable>
+                ))}
+            </ScrollView>
+          ) : null}
+
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionMainTitle, { fontFamily: font.bold }]}>Popular books</Text>
+            <Pressable onPress={() => void load()} hitSlop={8}>
+              <Text style={[styles.viewAllTxt, { fontFamily: font.semi }]}>See all</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.segmentRow}
+          >
+            <Pressable
+              onPress={clearQuickFilters}
+              style={[styles.segmentChip, !bookTypeChip && styles.segmentChipOn]}
+            >
+              <Text style={[styles.segmentTxt, !bookTypeChip && styles.segmentTxtOn, { fontFamily: font.semi }]}>
+                All
+              </Text>
+            </Pressable>
+            {BOOK_TYPES.map((tab) => (
+              <Pressable
+                key={tab}
+                onPress={() => setBookTypeChip((prev) => (prev === tab ? null : tab))}
+                style={[styles.segmentChip, bookTypeChip === tab && styles.segmentChipOn]}
+              >
+                <Text
+                  style={[styles.segmentTxt, bookTypeChip === tab && styles.segmentTxtOn, { fontFamily: font.semi }]}
+                >
+                  {tab}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.carouselContent}
+          >
+            {books.map((b) => renderPopularCard(b))}
+          </ScrollView>
+
+          {hasAnyFilter ? (
+            <Pressable onPress={clearAllFilters} style={styles.clearAllRow}>
+              <Text style={[styles.clearAllTxt, { fontFamily: font.bold }]}>Clear all filters</Text>
+              <Ionicons name="close-circle-outline" size={18} color={themePrimary} />
+            </Pressable>
+          ) : null}
+
+          {loading ? (
+            <ActivityIndicator style={{ marginTop: 28 }} color={themePrimary} size="large" />
+          ) : error ? (
+            <Text style={[styles.error, fontBase]}>{error}</Text>
+          ) : books.length === 0 ? (
+            <View style={[styles.emptyCard, cardShadow]}>
+              <Text style={[styles.muted, fontBase]}>
+                {hasAnyFilter
+                  ? 'No books match these filters. Try clearing some options or broadening your search.'
+                  : 'No books yet. Be the first to list one from your shelf.'}
+              </Text>
+            </View>
+          ) : null}
+
+          {wantedLoading || wantedItems.length > 0 ? (
+            <View style={styles.wantedSection}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={[styles.sectionMainTitle, { fontFamily: font.bold }]}>Wanted books</Text>
+                <Pressable onPress={openWantedBoard} hitSlop={8}>
+                  <Text style={[styles.viewAllTxt, { fontFamily: font.semi }]}>Board</Text>
+                </Pressable>
+              </View>
+              <Text style={[styles.wantedSub, { fontFamily: font.regular }]}>
+                Readers looking for titles — tap a card to offer help.
+              </Text>
+              {wantedLoading && wantedItems.length === 0 ? (
+                <ActivityIndicator style={{ marginVertical: 14 }} color={themeGreen} />
+              ) : (
+                <View style={styles.wantedGrid}>
+                  {wantedItems.map((w) => {
+                    const subjectLine = w.subject?.trim() || w.author?.trim() || 'Request';
+                    return (
+                      <Pressable
+                        key={w._id}
+                        onPress={() => openWantedDetail(w._id)}
+                        style={({ pressed }) => [
+                          styles.wantedCardOuter,
+                          cardShadow,
+                          pressed && styles.cardPressed,
+                        ]}
+                      >
+                        <View style={styles.wantedThumbWrap}>
+                          {w.wantedBookPhoto ? (
+                            <Image
+                              source={{ uri: w.wantedBookPhoto }}
+                              style={styles.wantedThumbImg as ImageStyle}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <View style={styles.wantedThumbPh}>
+                              <Ionicons name="book-outline" size={36} color={themePrimary} />
+                            </View>
+                          )}
+                        </View>
+                        <View style={styles.wantedCardInner}>
+                          <Text style={[styles.wantedGridTitle, { fontFamily: font.bold }]} numberOfLines={2}>
+                            {w.title}
+                          </Text>
+                          <View style={styles.wantedMetaRow}>
+                            <View style={styles.wantedMetaLeft}>
+                              <Ionicons name="layers-outline" size={14} color={themeGreen} />
+                              <Text style={[styles.wantedMetaTxt, { fontFamily: font.medium }]} numberOfLines={1}>
+                                {subjectLine}
+                              </Text>
+                            </View>
+                            <View style={styles.wantedMetaRight}>
+                              <Ionicons name="time-outline" size={14} color={themePrimary} />
+                              <Text style={[styles.wantedMetaTime, { fontFamily: font.medium }]}>
+                                {relativeListingAge(w.createdAt)}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          ) : null}
+        </View>
       </ScrollView>
 
       <Modal
@@ -290,74 +622,121 @@ export function BrowseListScreen({ navigation }: Props) {
         <View style={styles.modalRoot}>
           <Pressable style={styles.modalBackdrop} onPress={() => setAdvModalOpen(false)} />
           <View style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 20) }]}>
-          <View style={styles.modalHandle} />
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Advanced filters</Text>
-            <Pressable onPress={() => setAdvModalOpen(false)} hitSlop={12}>
-              <Ionicons name="close" size={26} color={lead} />
-            </Pressable>
-          </View>
-          <Text style={styles.modalHint}>Combine with the search bar and quick type chips.</Text>
-
-          <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <Text style={styles.advLabel}>Condition</Text>
-            <View style={styles.chipWrap}>
-              <Pressable
-                onPress={() => setAdvCondition(null)}
-                style={[styles.advChip, !advCondition && styles.advChipOn]}
-              >
-                <Text style={[styles.advChipTxt, !advCondition && styles.advChipTxtOn]}>Any</Text>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { fontFamily: font.extraBold }]}>Advanced filters</Text>
+              <Pressable onPress={() => setAdvModalOpen(false)} hitSlop={12}>
+                <Ionicons name="close" size={26} color={themeInk} />
               </Pressable>
-              {CONDITIONS.map((c) => (
+            </View>
+            <Text style={[styles.modalHint, { fontFamily: font.regular }]}>
+              Combine with the search bar. Book type mirrors the category chips under Popular books.
+            </Text>
+
+            <ScrollView
+              style={styles.modalScroll}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={[styles.advLabel, { fontFamily: font.semi }]}>Book type</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                style={styles.advBookTypeScroll}
+                contentContainerStyle={styles.advBookTypeScrollContent}
+              >
                 <Pressable
-                  key={c}
-                  onPress={() => setAdvCondition((prev) => (prev === c ? null : c))}
-                  style={[styles.advChip, advCondition === c && styles.advChipOn]}
+                  onPress={() => setBookTypeChip(null)}
+                  style={[styles.advChip, !bookTypeChip && styles.advChipOn]}
                 >
-                  <Text style={[styles.advChipTxt, advCondition === c && styles.advChipTxtOn]}>{c}</Text>
+                  <Text
+                    style={[styles.advChipTxt, !bookTypeChip && styles.advChipTxtOn, { fontFamily: font.medium }]}
+                  >
+                    Any
+                  </Text>
                 </Pressable>
-              ))}
-            </View>
+                {BOOK_TYPES.map((tab) => (
+                  <Pressable
+                    key={tab}
+                    onPress={() => setBookTypeChip((prev) => (prev === tab ? null : tab))}
+                    style={[styles.advChip, bookTypeChip === tab && styles.advChipOn]}
+                  >
+                    <Text
+                      style={[styles.advChipTxt, bookTypeChip === tab && styles.advChipTxtOn, { fontFamily: font.medium }]}
+                    >
+                      {tab}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
 
-            <Text style={styles.advLabel}>Language</Text>
-            <TextInput
-              style={styles.advInput}
-              placeholder="e.g. English, Sinhala"
-              placeholderTextColor={warmHaze}
-              value={advLanguage}
-              onChangeText={setAdvLanguage}
-            />
+              <Text style={[styles.advLabel, { fontFamily: font.semi }]}>Condition</Text>
+              <View style={styles.chipWrap}>
+                <Pressable
+                  onPress={() => setAdvCondition(null)}
+                  style={[styles.advChip, !advCondition && styles.advChipOn]}
+                >
+                  <Text
+                    style={[styles.advChipTxt, !advCondition && styles.advChipTxtOn, { fontFamily: font.medium }]}
+                  >
+                    Any
+                  </Text>
+                </Pressable>
+                {CONDITIONS.map((c) => (
+                  <Pressable
+                    key={c}
+                    onPress={() => setAdvCondition((prev) => (prev === c ? null : c))}
+                    style={[styles.advChip, advCondition === c && styles.advChipOn]}
+                  >
+                    <Text
+                      style={[styles.advChipTxt, advCondition === c && styles.advChipTxtOn, { fontFamily: font.medium }]}
+                    >
+                      {c}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
 
-            <Text style={styles.advLabel}>Publication year</Text>
-            <View style={styles.yearRow}>
+              <Text style={[styles.advLabel, { fontFamily: font.semi }]}>Language</Text>
               <TextInput
-                style={[styles.advInput, styles.yearInput]}
-                placeholder="From"
-                placeholderTextColor={warmHaze}
-                value={advYearMin}
-                onChangeText={setAdvYearMin}
-                keyboardType="number-pad"
+                style={[styles.advInput, { fontFamily: font.regular }]}
+                placeholder="e.g. English, Sinhala"
+                placeholderTextColor={themeMuted}
+                value={advLanguage}
+                onChangeText={setAdvLanguage}
               />
-              <Text style={styles.yearDash}>–</Text>
-              <TextInput
-                style={[styles.advInput, styles.yearInput]}
-                placeholder="To"
-                placeholderTextColor={warmHaze}
-                value={advYearMax}
-                onChangeText={setAdvYearMax}
-                keyboardType="number-pad"
-              />
-            </View>
-          </ScrollView>
 
-          <View style={styles.modalActions}>
-            <Pressable style={[styles.modalBtn, styles.modalBtnGhost]} onPress={clearAdvanced}>
-              <Text style={styles.modalBtnGhostTxt}>Reset panel</Text>
-            </Pressable>
-            <Pressable style={[styles.modalBtn, styles.modalBtnPrimary]} onPress={() => setAdvModalOpen(false)}>
-              <Text style={styles.modalBtnPrimaryTxt}>Apply</Text>
-            </Pressable>
-          </View>
+              <Text style={[styles.advLabel, { fontFamily: font.semi }]}>Publication year</Text>
+              <View style={styles.yearRow}>
+                <TextInput
+                  style={[styles.advInput, styles.yearInput, { fontFamily: font.regular }]}
+                  placeholder="From"
+                  placeholderTextColor={themeMuted}
+                  value={advYearMin}
+                  onChangeText={setAdvYearMin}
+                  keyboardType="number-pad"
+                />
+                <Text style={[styles.yearDash, { fontFamily: font.medium }]}>–</Text>
+                <TextInput
+                  style={[styles.advInput, styles.yearInput, { fontFamily: font.regular }]}
+                  placeholder="To"
+                  placeholderTextColor={themeMuted}
+                  value={advYearMax}
+                  onChangeText={setAdvYearMax}
+                  keyboardType="number-pad"
+                />
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <Pressable style={[styles.modalBtn, styles.modalBtnGhost]} onPress={clearAdvanced}>
+                <Text style={[styles.modalBtnGhostTxt, { fontFamily: font.bold }]}>Reset panel</Text>
+              </Pressable>
+              <Pressable style={[styles.modalBtn, styles.modalBtnPrimary]} onPress={() => setAdvModalOpen(false)}>
+                <Text style={[styles.modalBtnPrimaryTxt, { fontFamily: font.bold }]}>Apply</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -366,198 +745,495 @@ export function BrowseListScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: cascadingWhite },
-  scroll: { paddingHorizontal: 20, paddingBottom: 32, gap: 12 },
-  headerRow: {
+  flex: { flex: 1, backgroundColor: themePageBg },
+  scrollRoot: { flex: 1, backgroundColor: themePageBg },
+  scroll: { flexGrow: 1 },
+  heroBlock: {
+    backgroundColor: themePrimary,
+    borderBottomLeftRadius: HERO_BOTTOM_RADIUS,
+    borderBottomRightRadius: HERO_BOTTOM_RADIUS,
+    overflow: 'hidden',
+    paddingBottom: 30,
+  },
+  heroPad: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    gap: 18,
+  },
+  heroTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
+    gap: 10,
+    position: 'relative',
   },
-  greetTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: lead,
-  },
-  greetSub: { marginTop: 2, fontSize: 14, color: textSecondary },
-  avatarCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#ececec',
+  heroIconBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(30, 22, 80, 0.32)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  searchRow: { marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  searchWrap: {
+  heroIconBtnMuted: { opacity: 0.92 },
+  heroTopSpacer: { flex: 1 },
+  notifWrap: { position: 'relative' },
+  notifDot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: themeGreen,
+    borderWidth: 2,
+    borderColor: themePrimary,
+  },
+  heroHeadingBlock: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    marginTop: 2,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    gap: 2,
+  },
+  heroTaglineLine1: {
+    color: cascadingWhite,
+    textAlign: 'center',
+    alignSelf: 'stretch',
+    fontSize: 34,
+    lineHeight: Platform.select({ ios: 40, default: 38 }),
+    letterSpacing: 0.75,
+    textShadowColor: 'rgba(24,14,72,0.35)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 10,
+  },
+  heroTaglineLine2: {
+    marginTop: 0,
+    color: cascadingWhite,
+    textAlign: 'center',
+    alignSelf: 'stretch',
+    fontSize: 52,
+    lineHeight: Platform.select({ ios: 56, default: 52 }),
+    letterSpacing: 1,
+    textShadowColor: 'rgba(24,14,72,0.4)',
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 12,
+  },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  searchGlass: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f3f3f5',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: Platform.select({ ios: 12, default: 10 }),
+    gap: 10,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
+    borderColor: 'rgba(255,255,255,0.35)',
   },
-  searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, fontSize: 14, color: lead, paddingVertical: 0 },
-  filterFab: {
-    width: 42,
-    height: 42,
-    borderRadius: 10,
-    backgroundColor: '#f3f3f5',
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: cascadingWhite,
+    paddingVertical: 0,
+  },
+  filterCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: cascadingWhite,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#101011',
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  filterCircleOn: {
+    borderWidth: 2,
+    borderColor: themeOrange,
+  },
+  bodyPad: {
+    paddingHorizontal: 20,
+    marginTop: 0,
+    gap: 16,
+    backgroundColor: themePageBg,
+    paddingBottom: 8,
+  },
+  bodyPadNoFeature: {
+    paddingTop: 14,
+  },
+  wantedSection: {
+    gap: 8,
+    marginTop: 8,
+    paddingBottom: 12,
+  },
+  wantedSub: {
+    fontSize: 13,
+    color: themeMuted,
+    lineHeight: 18,
+    marginTop: -4,
+    marginBottom: 4,
+  },
+  wantedGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: WANTED_GRID_GAP,
+    rowGap: WANTED_GRID_GAP,
+    paddingTop: 4,
+  },
+  wantedCardOuter: {
+    width: WANTED_CARD_W,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: themeCard,
+  },
+  wantedThumbWrap: {
+    width: '100%',
+    aspectRatio: 1.12,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: themeIllustrationBlue,
+    position: 'relative',
+  },
+  wantedThumbImg: {
+    width: '100%',
+    height: '100%',
+  },
+  wantedThumbPh: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(113,110,255,0.08)',
+  },
+  wantedCardInner: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 12,
+    gap: 6,
+  },
+  wantedGridTitle: {
+    fontSize: 14,
+    color: themeInk,
+    lineHeight: 19,
+  },
+  wantedMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 2,
+  },
+  wantedMetaLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flex: 1,
+    minWidth: 0,
+  },
+  wantedMetaRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 0,
+  },
+  wantedMetaTxt: {
+    flex: 1,
+    fontSize: 11,
+    color: themeInk,
+    minWidth: 0,
+  },
+  wantedMetaTime: {
+    fontSize: 11,
+    color: themeMuted,
+  },
+  featureOverlap: {
+    marginTop: -FEATURE_OVERLAP_UP + GAP_SEARCH_TO_FEATURE_CARD,
+    zIndex: 4,
+    elevation: 8,
+  },
+  latestCarouselRow: {
+    flexGrow: 0,
+    marginHorizontal: -20,
+  },
+  latestCarouselContent: {
+    flexDirection: 'row',
+    gap: LATEST_CARD_GAP,
+    paddingHorizontal: 20,
+    paddingTop: Platform.select({ ios: 10, default: 8 }),
+    paddingBottom: 14,
+    paddingRight: 20,
+  },
+  latestCard: {
+    width: LATEST_CARD_W,
+    borderRadius: 28,
+    overflow: 'hidden',
+    backgroundColor: themeCard,
+  },
+  latestImageOuter: {
+    height: 200,
+    backgroundColor: themeIllustrationBlue,
+    position: 'relative',
+  },
+  latestImage: {
+    width: '100%',
+    height: '100%',
+  },
+  latestImageFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: themeIllustrationBlue,
+  },
+  latestTextCol: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  liveBadge: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    backgroundColor: themeOrange,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 2,
+  },
+  liveBadgeTxt: {
+    fontSize: 11,
+    color: cascadingWhite,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  featureOverlay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: 'rgba(255,255,255,0.88)',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(0,0,0,0.04)',
+  },
+  featureCat: {
+    fontSize: 17,
+    color: themeInk,
+  },
+  featureSubtitle: {
+    marginTop: 2,
+    fontSize: 13,
+    color: themeMuted,
+  },
+  featureListerWrap: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    padding: 3,
+    backgroundColor: cascadingWhite,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: themeInk,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  featureListerImg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(113,110,255,0.22)',
+    overflow: 'hidden',
+  },
+  featureListerFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(113,110,255,0.35)',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
+    borderColor: 'rgba(113,110,255,0.55)',
+  },
+  featureListerInitials: {
+    fontSize: 17,
+    color: themeInk,
+    letterSpacing: -0.3,
+  },
+  sectionHeaderRow: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sectionMainTitle: { fontSize: 18, color: themeInk, letterSpacing: -0.3 },
+  viewAllTxt: { fontSize: 14, color: themePrimary },
+  carouselContent: {
+    flexDirection: 'row',
+    gap: 14,
+    paddingRight: 24,
+    paddingVertical: 4,
+  },
+  popCard: {
+    width: CARD_W,
+    borderRadius: 28,
+    overflow: 'hidden',
+    backgroundColor: themeCard,
+  },
+  cardPressed: { opacity: 0.93, transform: [{ scale: 0.993 }] },
+  popImageWrap: {
+    height: 130,
+    backgroundColor: themeIllustrationBlue,
+    position: 'relative',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    overflow: 'hidden',
+  },
+  popImage: { width: '100%', height: '100%' },
+  popImageFallback: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  filterFabOn: {
-    backgroundColor: '#ececec',
-    borderColor: lead,
+  popBody: {
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 16,
+    gap: 8,
   },
-  sectionHeaderRow: { marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sectionMainTitle: { fontSize: 16, fontWeight: '800', color: lead },
-  viewAllTxt: { fontSize: 12, color: warmHaze, fontWeight: '700' },
-  segmentRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  popTitle: {
+    fontFamily: font.bold,
+    fontSize: 15,
+    color: themeInk,
+    lineHeight: 21,
+    minHeight: 42,
+  },
+  popAuthorLine: {
+    fontSize: 12,
+    color: themeMuted,
+    marginTop: -4,
+    lineHeight: 16,
+  },
+  popListerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  popListerName: {
+    flex: 1,
+    fontSize: 12,
+    color: themeInk,
+    minWidth: 0,
+  },
+  popListedDate: {
+    fontSize: 11,
+    color: themeMuted,
+    flexShrink: 0,
+  },
+  popRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexWrap: 'wrap',
+  },
+  popRatingScore: {
+    fontSize: 13,
+    color: themeInk,
+  },
+  popReviewCount: {
+    fontSize: 11,
+    color: themeMuted,
+    flex: 1,
+  },
+  popBadgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  miniPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  miniPillGreen: { backgroundColor: 'rgba(56,163,54,0.14)' },
+  miniPillLavender: { backgroundColor: 'rgba(113,110,255,0.14)' },
+  miniPillTxt: {
+    fontFamily: font.medium,
+    fontSize: 12,
+    color: themeMuted,
+    textTransform: 'capitalize',
+  },
+  segmentRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingTop: 10,
+    paddingBottom: 8,
+    paddingRight: 22,
+    alignItems: 'center',
+  },
   segmentChip: {
-    backgroundColor: '#f1f1f1',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: 'rgba(113,110,255,0.1)',
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(113,110,255,0.2)',
   },
-  segmentChipOn: { backgroundColor: '#1f1f1f' },
-  segmentTxt: { fontSize: 11, fontWeight: '700', color: '#8a8a8a' },
+  segmentChipOn: {
+    backgroundColor: themePrimary,
+    borderColor: themePrimary,
+  },
+  segmentTxt: { fontSize: 13, color: themePrimary },
   segmentTxtOn: { color: cascadingWhite },
   clearAllRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 4,
+    paddingVertical: 6,
   },
-  clearAllTxt: { fontSize: 14, fontWeight: '700', color: crunch },
-  pillRow: { gap: 16, paddingVertical: 6, paddingRight: 20 },
-  tabChip: {
-    marginRight: 2,
-    paddingBottom: 6,
-    minHeight: 30,
-    justifyContent: 'flex-end',
-  },
-  tabChipText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  tabChipTextOn: { color: lead, fontWeight: '800' },
-  tabChipTextOff: { color: warmHaze },
-  tabChipUnderline: {
-    marginTop: 6,
-    alignSelf: 'center',
-    width: 18,
-    height: 2,
-    borderRadius: 4,
-    backgroundColor: lead,
+  clearAllTxt: { fontSize: 14, color: themePrimary },
+  mutedHint: {
+    fontSize: 14,
+    color: themeMuted,
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 12,
   },
   emptyCard: {
     marginTop: 8,
-    borderRadius: 24,
-    padding: 20,
-    backgroundColor: cascadingWhite,
+    borderRadius: 26,
+    padding: 22,
+    backgroundColor: themeCard,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
+    borderColor: 'rgba(113,110,255,0.12)',
   },
-  muted: { fontSize: 15, lineHeight: 22, color: textSecondary },
-  error: { color: '#b3261e', fontSize: 14, marginTop: 8 },
-  gridWrap: {
-    marginTop: 4,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 14,
-  },
-  gridCard: {
-    width: '48%',
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: cascadingWhite,
-  },
-  featureImageWrap: { width: '100%', height: 190, backgroundColor: '#d9d9dd' },
-  featureImage: { width: '100%', height: '100%' },
-  coverFallback: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.5)',
-  },
-  cardBody: {
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    backgroundColor: cascadingWhite,
-  },
-  featureTitle: { fontSize: 13, fontWeight: '800', color: lead },
-  featureSub: { fontSize: 10, color: textSecondary, flex: 1 },
-  featureMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 4,
-    marginTop: 5,
-  },
-  listerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 6 },
-  listerAvatar: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#dfe3e8',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  listerAvatarImg: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: chineseSilver,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-  },
-  listerAvatarTxt: { fontSize: 10, fontWeight: '800', color: lead },
-  conditionChipLarge: {
-    fontSize: 9,
-    fontWeight: '800',
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    textTransform: 'capitalize',
-    overflow: 'hidden',
-  },
-  conditionChipNew: { backgroundColor: '#b8f2c0', color: '#0f5a28' },
-  conditionChipGood: { backgroundColor: '#ffe79d', color: '#7a5a00' },
-  conditionChipPoor: { backgroundColor: '#ffc8c8', color: '#8a1f1f' },
+  muted: { fontSize: 15, lineHeight: 22, color: themeMuted },
+  error: { color: '#c62828', fontSize: 14, marginTop: 8 },
   modalRoot: {
     flex: 1,
     justifyContent: 'flex-end',
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(32,32,34,0.45)',
+    backgroundColor: 'rgba(16,16,17,0.45)',
   },
   modalSheet: {
     backgroundColor: cascadingWhite,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     paddingHorizontal: 20,
     paddingTop: 8,
     maxHeight: '88%',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
+    borderTopColor: chineseSilver,
   },
   modalHandle: {
     alignSelf: 'center',
     width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: dreamland,
-    marginBottom: 12,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: chineseSilver,
+    marginBottom: 14,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -565,62 +1241,85 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 6,
   },
-  modalTitle: { fontSize: 20, fontWeight: '800', color: lead },
-  modalHint: { fontSize: 14, color: textSecondary, lineHeight: 20, marginBottom: 16 },
+  modalTitle: { fontSize: 20, color: themeInk },
+  modalHint: { fontSize: 14, color: themeMuted, lineHeight: 20, marginBottom: 16 },
   modalScroll: { maxHeight: 360 },
+  advBookTypeScroll: {
+    marginHorizontal: -20,
+    marginBottom: 12,
+  },
+  advBookTypeScrollContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 4,
+  },
   advLabel: {
     fontSize: 13,
-    fontWeight: '700',
-    color: warmHaze,
+    color: themeMuted,
     marginBottom: 8,
     marginTop: 4,
   },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   advChip: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
-    backgroundColor: cascadingWhite,
+    backgroundColor: themeCard,
   },
-  advChipOn: { backgroundColor: chineseSilver, borderColor: lead },
-  advChipTxt: { fontSize: 14, fontWeight: '700', color: textSecondary, textTransform: 'capitalize' },
-  advChipTxtOn: { color: lead },
+  advChipOn: {
+    backgroundColor: 'rgba(113,110,255,0.12)',
+    borderColor: themePrimary,
+  },
+  advChipTxt: { fontSize: 14, color: themeMuted, textTransform: 'capitalize' },
+  advChipTxtOn: { color: themePrimary },
   advInput: {
-    backgroundColor: '#f3f3f5',
-    borderRadius: 14,
+    backgroundColor: themePageBg,
+    borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
+    borderColor: chineseSilver,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
-    color: lead,
+    color: themeInk,
     marginBottom: 14,
   },
   yearRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
   yearInput: { flex: 1, marginBottom: 0 },
-  yearDash: { fontSize: 18, color: warmHaze, fontWeight: '600' },
+  yearDash: { fontSize: 18, color: themeMuted },
   modalActions: {
     flexDirection: 'row',
     gap: 12,
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: dreamland,
+    borderTopColor: chineseSilver,
   },
   modalBtn: {
     flex: 1,
     paddingVertical: 14,
-    borderRadius: 16,
+    borderRadius: 18,
     alignItems: 'center',
   },
   modalBtnGhost: {
     backgroundColor: cascadingWhite,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
+    borderColor: chineseSilver,
   },
-  modalBtnGhostTxt: { fontSize: 16, fontWeight: '700', color: textSecondary },
-  modalBtnPrimary: { backgroundColor: crunch },
-  modalBtnPrimaryTxt: { fontSize: 16, fontWeight: '800', color: lead },
+  modalBtnGhostTxt: { fontSize: 16, color: themeMuted },
+  modalBtnPrimary: {
+    backgroundColor: themePrimary,
+    shadowColor: themePrimary,
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  modalBtnPrimaryTxt: {
+    fontSize: 16,
+    color: cascadingWhite,
+  },
 });

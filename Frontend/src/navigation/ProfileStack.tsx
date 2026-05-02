@@ -13,11 +13,16 @@ import { SubmitPointScreen } from '../screens/SubmitPointScreen';
 import { UserReviewsScreen } from '../screens/UserReviewsScreen';
 import type { ProfileStackParamList } from './profileStackTypes';
 
+import { themePageBg } from '../theme/courseTheme';
+
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
 
 export function ProfileStack() {
   return (
-    <Stack.Navigator id="ProfileStackRoot" screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      id="ProfileStackRoot"
+      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: themePageBg } }}
+    >
       <Stack.Screen name="ProfileHome" component={ProfileScreen} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="MyListings" component={MyListingsScreen} />

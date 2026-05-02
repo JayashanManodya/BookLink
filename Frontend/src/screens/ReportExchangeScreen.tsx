@@ -19,14 +19,7 @@ import { api, apiErrorMessage } from '../lib/api';
 import { alertOk } from '../lib/platformAlert';
 import type { ProfileStackParamList } from '../navigation/profileStackTypes';
 import type { RequestsStackParamList } from '../navigation/requestsStackTypes';
-import {
-  cascadingWhite,
-  crunch,
-  dreamland,
-  lead,
-  textSecondary,
-  warmHaze,
-} from '../theme/colors';
+import { cascadingWhite, dreamland, lead, textSecondary, warmHaze, themePageBg, themePrimary, themeSurfaceMuted } from '../theme/colors';
 import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { cardShadow } from '../theme/shadows';
 import type { ExchangeReport } from '../types/report';
@@ -206,7 +199,7 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
         </Pressable>
       </View>
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 24 }} color={crunch} />
+        <ActivityIndicator style={{ marginTop: 24 }} color={themePrimary} />
       ) : (
         <ScrollView
           contentContainerStyle={[styles.scroll, { gap: FORM_SCROLL_GAP }]}
@@ -217,7 +210,7 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
           {listerUi ? (
             <Pressable style={styles.chatWithReaderBtn} onPress={openChatWithReader}>
               <Ionicons name="chatbubbles-outline" size={20} color={lead} />
-              <Text style={styles.chatWithReaderTxt}>Chat with reader</Text>
+              <Text style={styles.chatWithReaderTxt}>Message reader</Text>
             </Pressable>
           ) : null}
           <Text style={styles.label}>What happened?</Text>
@@ -269,7 +262,7 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: cascadingWhite },
+  flex: { flex: 1, backgroundColor: themePageBg },
   topBar: { paddingHorizontal: 12, paddingBottom: 4 },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
   backText: { fontSize: 16, fontWeight: '600', color: lead },
@@ -280,7 +273,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: lead,
     lineHeight: 22,
-    backgroundColor: '#f3f3f5',
+    backgroundColor: themeSurfaceMuted,
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
@@ -296,7 +289,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
   input: {
     minHeight: 100,
-    backgroundColor: '#f3f3f5',
+    backgroundColor: themeSurfaceMuted,
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
@@ -308,7 +301,7 @@ const styles = StyleSheet.create({
   },
   submit: {
     marginTop: 8,
-    backgroundColor: crunch,
+    backgroundColor: themePrimary,
     borderRadius: 20,
     paddingVertical: 16,
     alignItems: 'center',
@@ -322,7 +315,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: 16,
-    backgroundColor: '#f3f3f5',
+    backgroundColor: themeSurfaceMuted,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
     alignSelf: 'stretch',

@@ -30,16 +30,19 @@ import type { RequestsStackParamList } from '../navigation/requestsStackTypes';
 import type { ExchangeRequest } from '../types/exchange';
 import type { CollectionPoint } from '../types/point';
 import {
-  cascadingWhite,
-  chatComposerBar,
-  chatSendActive,
-  chatWallpaper,
-  crunch,
-  dreamland,
-  lead,
-  textSecondary,
-  warmHaze,
-} from '../theme/colors';
+  messengerComposerBg,
+  messengerHintBg,
+  messengerInputFill,
+  messengerMeetupBannerBg,
+  messengerMeetupBannerBorder,
+  messengerPrimaryActionBg,
+  messengerScreenBg,
+  messengerSendActive,
+  messengerThreadBg,
+  messengerTopHairline,
+} from '../theme/chatMessengerTheme';
+import { cascadingWhite, dreamland, lead, textSecondary, warmHaze, themeSurfaceMuted } from '../theme/colors';
+import { themeGreen, themeMuted } from '../theme/courseTheme';
 
 type Props = NativeStackScreenProps<RequestsStackParamList, 'RequestChat'>;
 
@@ -136,7 +139,7 @@ export function RequestChatScreen({ navigation, route }: Props) {
       setMessages(msgRes.data.messages ?? []);
       setError(null);
     } catch (e: unknown) {
-      setError(apiErrorMessage(e, 'Could not load chat'));
+      setError(apiErrorMessage(e, 'Could not load messages'));
     } finally {
       setLoading(false);
     }
@@ -290,7 +293,7 @@ export function RequestChatScreen({ navigation, route }: Props) {
         <Avatar name={peerName || 'Reader'} uri={peerAvatarUrl} size={34} />
         <View style={styles.headTxtWrap}>
           <Text style={styles.headTitle} numberOfLines={1}>
-            {peerName || 'Chat'}
+            {peerName || 'Exchange'}
           </Text>
           <Text style={styles.headSub} numberOfLines={1}>
             {subtitle}
@@ -329,7 +332,7 @@ export function RequestChatScreen({ navigation, route }: Props) {
                 void openGoogleMapsDirections(request.meetupLatitude as number, request.meetupLongitude as number)
               }
             >
-              <Ionicons name="navigate-outline" size={16} color={lead} />
+              <Ionicons name="navigate-outline" size={16} color={cascadingWhite} />
               <Text style={styles.dirBtnTxt}>Directions</Text>
             </Pressable>
           ) : (
@@ -346,7 +349,7 @@ export function RequestChatScreen({ navigation, route }: Props) {
         <View style={styles.meetupHint}>
           <Text style={styles.meetupHintTxt}>
             Set the meet-up: choose a collection point, then add date, time, and a contact number. That summary is
-            sent in chat for both of you.
+            sent in this thread for both of you.
           </Text>
         </View>
       ) : request && !isAccepted ? (
@@ -360,10 +363,10 @@ export function RequestChatScreen({ navigation, route }: Props) {
       {isOwner && isAccepted ? (
         <Pressable style={styles.setMeetupBtn} onPress={() => openMeetupModal()} disabled={meetupBusy}>
           {meetupBusy ? (
-            <ActivityIndicator color={lead} size="small" />
+            <ActivityIndicator color={cascadingWhite} size="small" />
           ) : (
             <>
-              <Ionicons name="location-outline" size={20} color={lead} />
+              <Ionicons name="location-outline" size={20} color={cascadingWhite} />
               <Text style={styles.setMeetupTxt}>
                 {request?.meetupHandoffLabel ? 'Change meet-up point' : 'Set meet-up point'}
               </Text>
@@ -378,7 +381,7 @@ export function RequestChatScreen({ navigation, route }: Props) {
       >
         {loading ? (
           <View style={styles.chatPane}>
-            <ActivityIndicator style={{ marginTop: 30 }} color={crunch} />
+            <ActivityIndicator style={{ marginTop: 30 }} color={themeGreen} />
           </View>
         ) : (
           <ScrollView
@@ -404,7 +407,7 @@ export function RequestChatScreen({ navigation, route }: Props) {
               );
             })}
             {messages.length === 0 ? (
-              <Text style={styles.empty}>No messages yet. Start the chat.</Text>
+              <Text style={styles.empty}>No messages yet. Say hello.</Text>
             ) : null}
           </ScrollView>
         )}
@@ -423,7 +426,7 @@ export function RequestChatScreen({ navigation, route }: Props) {
             value={text}
             onChangeText={setText}
             placeholder="Write a message..."
-            placeholderTextColor={warmHaze}
+            placeholderTextColor={themeMuted}
             multiline
             maxLength={2000}
           />
@@ -487,7 +490,7 @@ export function RequestChatScreen({ navigation, route }: Props) {
                       value={meetupDateStr}
                       onChangeText={setMeetupDateStr}
                       placeholder="YYYY-MM-DD"
-                      placeholderTextColor={warmHaze}
+                      placeholderTextColor={themeMuted}
                       style={styles.modalInput}
                       autoCapitalize="none"
                       autoCorrect={false}
@@ -499,7 +502,7 @@ export function RequestChatScreen({ navigation, route }: Props) {
                       value={meetupTimeStr}
                       onChangeText={setMeetupTimeStr}
                       placeholder="HH:mm"
-                      placeholderTextColor={warmHaze}
+                      placeholderTextColor={themeMuted}
                       style={styles.modalInput}
                       autoCapitalize="none"
                       autoCorrect={false}
@@ -511,7 +514,7 @@ export function RequestChatScreen({ navigation, route }: Props) {
                       value={meetupContactStr}
                       onChangeText={setMeetupContactStr}
                       placeholder="Shown to the other reader for this handoff"
-                      placeholderTextColor={warmHaze}
+                      placeholderTextColor={themeMuted}
                       style={styles.modalInput}
                       keyboardType="phone-pad"
                     />
@@ -575,8 +578,8 @@ function Avatar({ name, uri, size }: { name: string; uri?: string; size: number 
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: cascadingWhite },
-  chatPane: { flex: 1, backgroundColor: chatWallpaper },
+  flex: { flex: 1, backgroundColor: messengerScreenBg },
+  chatPane: { flex: 1, backgroundColor: messengerThreadBg },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -586,7 +589,7 @@ const styles = StyleSheet.create({
     gap: 10,
     backgroundColor: cascadingWhite,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: dreamland,
+    borderBottomColor: messengerTopHairline,
   },
   backBtn: {
     width: 44,
@@ -604,9 +607,9 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     padding: 12,
     borderRadius: 14,
-    backgroundColor: '#eaf3de',
+    backgroundColor: messengerMeetupBannerBg,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#c0dd97',
+    borderColor: messengerMeetupBannerBorder,
     gap: 6,
   },
   meetupLabel: { fontSize: 11, fontWeight: '800', color: warmHaze, textTransform: 'uppercase' },
@@ -627,7 +630,15 @@ const styles = StyleSheet.create({
     borderColor: dreamland,
   },
   meetupContactTxt: { fontSize: 15, fontWeight: '800', color: lead },
-  meetupHint: { marginHorizontal: 12, marginBottom: 6, padding: 10, borderRadius: 12, backgroundColor: '#f3f3f5' },
+  meetupHint: {
+    marginHorizontal: 12,
+    marginBottom: 6,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: messengerHintBg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: messengerMeetupBannerBorder,
+  },
   meetupHintTxt: { fontSize: 13, color: textSecondary, lineHeight: 18 },
   pendingBanner: { marginHorizontal: 12, marginBottom: 6, padding: 10, borderRadius: 12, backgroundColor: '#faeeda' },
   pendingTxt: { fontSize: 13, color: '#854f0b', lineHeight: 18 },
@@ -640,18 +651,18 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingVertical: 12,
     borderRadius: 14,
-    backgroundColor: crunch,
+    backgroundColor: messengerPrimaryActionBg,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
+    borderColor: messengerMeetupBannerBorder,
   },
-  setMeetupTxt: { fontSize: 14, fontWeight: '800', color: lead },
+  setMeetupTxt: { fontSize: 14, fontWeight: '800', color: cascadingWhite },
   dirBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     alignSelf: 'flex-start',
     marginTop: 4,
-    backgroundColor: crunch,
+    backgroundColor: messengerPrimaryActionBg,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
@@ -669,14 +680,14 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
   },
-  dirBtnTxt: { fontSize: 13, fontWeight: '800', color: lead },
+  dirBtnTxt: { fontSize: 13, fontWeight: '800', color: cascadingWhite },
   dirBtnTxtMuted: { fontSize: 13, fontWeight: '700', color: textSecondary },
   msgList: {
     flexGrow: 1,
     paddingHorizontal: 12,
     paddingTop: 12,
     paddingBottom: 16,
-    backgroundColor: chatWallpaper,
+    backgroundColor: messengerThreadBg,
   },
   avatarFallback: {
     alignItems: 'center',
@@ -696,8 +707,8 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 4,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: dreamland,
-    backgroundColor: chatComposerBar,
+    borderTopColor: messengerTopHairline,
+    backgroundColor: messengerComposerBg,
   },
   attachBtn: {
     width: 44,
@@ -713,14 +724,14 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 44,
     maxHeight: 120,
-    backgroundColor: '#fff',
+    backgroundColor: messengerInputFill,
     borderRadius: 22,
     paddingHorizontal: 14,
     paddingVertical: 10,
     color: lead,
     fontSize: 15,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
+    borderColor: messengerTopHairline,
   },
   sendBtn: {
     width: 44,
@@ -729,7 +740,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendBtnActive: { backgroundColor: chatSendActive },
+  sendBtnActive: { backgroundColor: messengerSendActive },
   sendBtnDisabled: { backgroundColor: '#fff', borderWidth: StyleSheet.hairlineWidth, borderColor: dreamland, opacity: 0.85 },
   sendBtnOff: { opacity: 0.5 },
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
@@ -747,7 +758,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     padding: 12,
     borderRadius: 14,
-    backgroundColor: '#f3f3f5',
+    backgroundColor: themeSurfaceMuted,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
     gap: 4,
@@ -757,7 +768,7 @@ const styles = StyleSheet.create({
   modalField: { marginBottom: 14 },
   modalFieldLabel: { fontSize: 13, fontWeight: '800', color: warmHaze, marginBottom: 6 },
   modalInput: {
-    backgroundColor: '#f3f3f5',
+    backgroundColor: themeSurfaceMuted,
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: dreamland,
@@ -783,7 +794,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 14,
     alignItems: 'center',
-    backgroundColor: lead,
+    backgroundColor: messengerPrimaryActionBg,
   },
   modalConfirmBtnOff: { opacity: 0.7 },
   modalConfirmBtnTxt: { fontSize: 15, fontWeight: '800', color: cascadingWhite },

@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  type ImageStyle,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
@@ -16,25 +18,44 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, apiErrorMessage } from '../lib/api';
 import { SignInGateCard } from '../components/SignInGateCard';
+import { CourseScreenShell } from '../components/CourseScreenShell';
 import type { WishlistStackParamList } from '../navigation/wishlistStackTypes';
+import { cascadingWhite, dreamland, lead, textSecondary, themeSurfaceMuted } from '../theme/colors';
 import {
-  cascadingWhite,
-  chineseSilver,
-  crunch,
-  dreamland,
-  lead,
-  textSecondary,
-  warmHaze,
-} from '../theme/colors';
+  themeCard,
+  themeGreen,
+  themeIllustrationBlue,
+  themeInk,
+  themeMuted,
+  themePrimary,
+} from '../theme/courseTheme';
 import { cardShadow } from '../theme/shadows';
+import { font } from '../theme/typography';
 import type { WishlistItem } from '../types/wishlist';
 
 type Props = NativeStackScreenProps<WishlistStackParamList, 'WishlistBoard'>;
 
-function urgencyStyle(u: WishlistItem['urgency']) {
-  if (u === 'high') return { borderColor: '#f7c1c1', bg: '#fcebeb' };
-  if (u === 'medium') return { borderColor: '#fac775', bg: '#faeeda' };
-  return { borderColor: '#c0dd97', bg: '#eaf3de' };
+function relativeListingAge(iso?: string): string {
+  if (!iso) return 'Recently';
+  try {
+    const d = new Date(iso);
+    const diffMs = Date.now() - d.getTime();
+    if (diffMs < 0) return 'Recently';
+    const days = Math.floor(diffMs / 86400000);
+    if (days < 1) return 'Today';
+    if (days === 1) return '1 day ago';
+    if (days < 7) return `${days} days ago`;
+    if (days < 30) return `${Math.floor(days / 7)} wk ago`;
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  } catch {
+    return 'Recently';
+  }
+}
+
+function urgencyHeadline(u: WishlistItem['urgency']): string {
+  if (u === 'high') return 'High priority';
+  if (u === 'medium') return 'Medium priority';
+  return 'Low priority';
 }
 
 export function WishlistBoardScreen({ navigation }: Props) {
@@ -64,7 +85,7 @@ export function WishlistBoardScreen({ navigation }: Props) {
         const res = await api.get<{ items: WishlistItem[] }>(path);
         setItems(res.data.items ?? []);
       } catch (e: unknown) {
-        setError(apiErrorMessage(e, 'Could not load wishlist'));
+        setError(apiErrorMessage(e, 'Could not load wanted books'));
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -85,19 +106,13 @@ export function WishlistBoardScreen({ navigation }: Props) {
 
   if (!isSignedIn) {
     return (
-      <ScrollView
-        style={styles.root}
-        contentContainerStyle={[styles.scroll, { paddingTop: Math.max(insets.top, 8) + 8 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.title}>Wishlist</Text>
-        <Text style={styles.subtitle}>Wanted books</Text>
+      <CourseScreenShell title="Wanted books" subtitle="Posts from readers looking for titles." scroll scrollContentStyle={{ gap: 16 }}>
         <SignInGateCard
-          title="Sign in for your wishlist"
+          title="Sign in for wanted books"
           message="Post books you are looking for and browse what the community needs."
-          icon="heart-outline"
+          icon="book-outline"
         />
-      </ScrollView>
+      </CourseScreenShell>
     );
   }
 
@@ -107,26 +122,28 @@ export function WishlistBoardScreen({ navigation }: Props) {
       : `Your posts · ${items.length} ${items.length === 1 ? 'item' : 'items'}`;
 
   return (
-    <View style={[styles.root, { paddingTop: Math.max(insets.top, 8) + 8 }]}>
-      <View style={styles.headRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>{scope === 'community' ? 'Wanted books' : 'My wanted books'}</Text>
-          <Text style={styles.subtitle}>{subtitle}</Text>
+    <CourseScreenShell
+      title={scope === 'community' ? 'Wanted books' : 'My wanted books'}
+      subtitle={subtitle}
+      scroll={false}
+      headerRight={
+        <View style={styles.headerActions}>
+          <Pressable style={styles.headerChatsBtn} onPress={() => navigation.navigate('WishlistChats')} hitSlop={6}>
+            <Ionicons name="chatbubbles-outline" size={18} color={cascadingWhite} />
+            <Text style={styles.headerChatsTxt}>Inbox</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => navigation.navigate('PostWanted')}
+            style={styles.headerAddBtn}
+            hitSlop={8}
+            accessibilityLabel="Post a wanted book"
+          >
+            <Ionicons name="add" size={26} color={cascadingWhite} />
+          </Pressable>
         </View>
-        <Pressable style={styles.chatsPill} onPress={() => navigation.navigate('WishlistChats')} hitSlop={6}>
-          <Ionicons name="chatbubbles-outline" size={18} color={lead} />
-          <Text style={styles.chatsPillTxt}>Chats</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => navigation.navigate('PostWanted')}
-          style={styles.iconBtn}
-          hitSlop={8}
-          accessibilityLabel="Post a wanted book"
-        >
-          <Ionicons name="add" size={28} color={lead} />
-        </Pressable>
-      </View>
-
+      }
+    >
+      <View style={styles.signedInWrap}>
       <View style={styles.segment}>
         <Pressable
           onPress={() => setScope('community')}
@@ -143,7 +160,7 @@ export function WishlistBoardScreen({ navigation }: Props) {
       </View>
 
       {loading && !refreshing ? (
-        <ActivityIndicator style={{ marginTop: 24 }} color={crunch} />
+        <ActivityIndicator style={{ marginTop: 24 }} color={themePrimary} />
       ) : error ? (
         <Text style={styles.error}>{error}</Text>
       ) : (
@@ -154,7 +171,7 @@ export function WishlistBoardScreen({ navigation }: Props) {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => void fetchWishlist('pull')}
-              tintColor={crunch}
+              tintColor={themePrimary}
             />
           }
         >
@@ -168,28 +185,67 @@ export function WishlistBoardScreen({ navigation }: Props) {
             </View>
           ) : (
             items.map((w) => {
-              const u = urgencyStyle(w.urgency);
-              const detailLine = [w.author, w.subject].filter(Boolean).join(' · ');
+              const tagLine = [w.author?.trim(), w.subject?.trim()].filter(Boolean).join(' · ') || 'Book request';
+              const listed = relativeListingAge(w.createdAt);
+              const tailLabel =
+                scope === 'community'
+                  ? w.ownerDisplayName?.trim() || 'Community reader'
+                  : 'Your post';
+
               return (
                 <Pressable
                   key={w._id}
-                  style={[styles.wishCard, { backgroundColor: u.bg, borderColor: u.borderColor }]}
+                  style={({ pressed }) => [
+                    styles.wishRowCard,
+                    cardShadow,
+                    pressed && styles.wishRowPressed,
+                  ]}
                   onPress={() => navigation.navigate('WantedBookDetail', { wishlistItemId: w._id })}
                 >
-                  <View style={styles.wishTop}>
-                    <Text style={styles.wishName}>{w.title}</Text>
-                    <Text style={styles.urgency}>{w.urgency}</Text>
+                  <View style={styles.wishThumb}>
+                    {w.wantedBookPhoto ? (
+                      <Image
+                        source={{ uri: w.wantedBookPhoto }}
+                        style={styles.wishThumbImg as ImageStyle}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.wishThumbPh}>
+                        <Ionicons name="book-outline" size={32} color={themePrimary} />
+                      </View>
+                    )}
                   </View>
-                  {detailLine ? <Text style={styles.wishDetail}>{detailLine}</Text> : null}
-                  {w.description ? (
-                    <Text style={styles.wishDesc} numberOfLines={2}>
-                      {w.description}
+                  <View style={styles.wishRowBody}>
+                    <Text style={[styles.wishRowTitle, { fontFamily: font.bold }]} numberOfLines={2}>
+                      {w.title}
                     </Text>
-                  ) : null}
-                  <Text style={styles.wishMeta}>
-                    {[w.language, scope === 'community' ? w.ownerDisplayName : null].filter(Boolean).join(' · ')}
-                  </Text>
-                  <Text style={styles.openHint}>Tap to open · chat if you have this book</Text>
+                    <View style={styles.wishMetaRow}>
+                      <View style={styles.wishMetaCluster}>
+                        <View style={[styles.metaIconBubble, styles.metaIconGreen]}>
+                          <Ionicons name="layers-outline" size={13} color={themeGreen} />
+                        </View>
+                        <Text style={[styles.wishMetaTxt, { fontFamily: font.regular }]} numberOfLines={1}>
+                          {tagLine}
+                        </Text>
+                      </View>
+                      <View style={[styles.wishMetaCluster, styles.wishMetaClusterRight]}>
+                        <View style={[styles.metaIconBubble, styles.metaIconPurple]}>
+                          <Ionicons name="time-outline" size={13} color={themePrimary} />
+                        </View>
+                        <Text style={[styles.wishMetaTxt, { fontFamily: font.regular }]} numberOfLines={1}>
+                          {listed}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.wishBottomRow}>
+                      <Text style={[styles.wishUrgencyAccent, { fontFamily: font.bold }]}>
+                        {urgencyHeadline(w.urgency)}
+                      </Text>
+                      <Text style={[styles.wishTailMuted, { fontFamily: font.medium }]} numberOfLines={1}>
+                        {tailLabel}
+                      </Text>
+                    </View>
+                  </View>
                 </Pressable>
               );
             })
@@ -202,44 +258,42 @@ export function WishlistBoardScreen({ navigation }: Props) {
       >
         <Text style={styles.fabSecondaryText}>See matches with listings</Text>
       </Pressable>
-    </View>
+      </View>
+    </CourseScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: cascadingWhite, paddingHorizontal: 20, paddingBottom: 24 },
-  scroll: { paddingHorizontal: 20, paddingBottom: 32 },
-  headRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
-  chatsPill: {
+  signedInWrap: { flex: 1, position: 'relative' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerChatsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
+    paddingVertical: 8,
     paddingHorizontal: 12,
-    paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: chineseSilver,
+    backgroundColor: 'rgba(255,255,255,0.22)',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-    marginTop: 2,
+    borderColor: 'rgba(255,255,255,0.4)',
+    marginBottom: 2,
   },
-  chatsPillTxt: { fontSize: 14, fontWeight: '800', color: lead },
-  iconBtn: {
+  headerChatsTxt: { fontSize: 14, fontWeight: '800', color: cascadingWhite },
+  headerAddBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: cascadingWhite,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
     alignItems: 'center',
     justifyContent: 'center',
-    ...cardShadow,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.4)',
+    marginBottom: 2,
   },
-  title: { fontSize: 28, fontWeight: '800', color: lead, letterSpacing: -0.5 },
-  subtitle: { marginTop: 4, fontSize: 15, color: warmHaze, fontWeight: '600' },
   segment: {
     flexDirection: 'row',
-    marginTop: 16,
-    backgroundColor: '#f3f3f5',
+    marginTop: 4,
+    backgroundColor: themeSurfaceMuted,
     borderRadius: 14,
     padding: 4,
     gap: 4,
@@ -250,9 +304,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
-  segmentBtnOn: { backgroundColor: crunch },
+  segmentBtnOn: { backgroundColor: themePrimary },
   segmentTxt: { fontSize: 14, fontWeight: '700', color: textSecondary },
-  segmentTxtOn: { color: lead },
+  segmentTxtOn: { color: cascadingWhite },
   list: { paddingBottom: 110, gap: 12, marginTop: 16 },
   card: {
     backgroundColor: cascadingWhite,
@@ -263,29 +317,96 @@ const styles = StyleSheet.create({
   },
   body: { fontSize: 15, lineHeight: 22, color: textSecondary },
   error: { color: '#b3261e', marginTop: 12 },
-  wishCard: {
-    borderRadius: 20,
-    borderWidth: StyleSheet.hairlineWidth,
+  wishRowCard: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 14,
     padding: 12,
-    ...cardShadow,
+    borderRadius: 20,
+    backgroundColor: themeCard,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(16,16,17,0.06)',
   },
-  wishTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
-  wishName: { flex: 1, fontSize: 17, fontWeight: '800', color: lead },
-  urgency: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: lead,
-    textTransform: 'capitalize',
-    backgroundColor: 'rgba(255,255,255,0.65)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
+  wishRowPressed: { opacity: 0.94, transform: [{ scale: 0.995 }] },
+  wishThumb: {
+    width: 92,
+    height: 92,
+    borderRadius: 16,
     overflow: 'hidden',
+    backgroundColor: themeIllustrationBlue,
+    flexShrink: 0,
   },
-  wishDetail: { marginTop: 8, fontSize: 14, color: lead, fontWeight: '600' },
-  wishDesc: { marginTop: 6, fontSize: 13, color: textSecondary, lineHeight: 18 },
-  wishMeta: { marginTop: 6, fontSize: 14, color: textSecondary },
-  openHint: { marginTop: 8, fontSize: 12, fontWeight: '700', color: warmHaze },
+  wishThumbImg: { width: '100%', height: '100%' },
+  wishThumbPh: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(113,110,255,0.08)',
+  },
+  wishRowBody: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 2,
+  },
+  wishRowTitle: {
+    fontSize: 16,
+    color: themeInk,
+    lineHeight: 22,
+    letterSpacing: -0.2,
+  },
+  wishMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  wishMetaCluster: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+    minWidth: 0,
+  },
+  wishMetaClusterRight: {
+    flex: 0,
+    flexShrink: 0,
+    maxWidth: '46%',
+  },
+  metaIconBubble: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  metaIconGreen: { backgroundColor: 'rgba(56,163,54,0.18)' },
+  metaIconPurple: { backgroundColor: 'rgba(113,110,255,0.18)' },
+  wishMetaTxt: {
+    flexShrink: 1,
+    fontSize: 12,
+    color: themeMuted,
+    lineHeight: 16,
+  },
+  wishBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 2,
+  },
+  wishUrgencyAccent: {
+    fontSize: 15,
+    color: themePrimary,
+    letterSpacing: -0.2,
+  },
+  wishTailMuted: {
+    flex: 1,
+    fontSize: 12,
+    color: themeMuted,
+    textAlign: 'right',
+  },
   fabSecondary: {
     position: 'absolute',
     left: 20,

@@ -7,11 +7,16 @@ import { WishlistMatchesScreen } from '../screens/WishlistMatchesScreen';
 import { WishlistThreadChatScreen } from '../screens/WishlistThreadChatScreen';
 import type { WishlistStackParamList } from './wishlistStackTypes';
 
+import { themePageBg } from '../theme/courseTheme';
+
 const Stack = createNativeStackNavigator<WishlistStackParamList>();
 
 export function WishlistStack() {
   return (
-    <Stack.Navigator id="WishlistStackRoot" screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      id="WishlistStackRoot"
+      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: themePageBg } }}
+    >
       <Stack.Screen name="WishlistBoard" component={WishlistBoardScreen} />
       <Stack.Screen name="WishlistChats" component={WishlistChatsScreen} />
       <Stack.Screen name="PostWanted" component={PostWantedBookScreen} />
