@@ -48,7 +48,8 @@ export default function App() {
         <View style={styles.missing}>
           <Text style={styles.missingTitle}>Missing Clerk key</Text>
           <Text style={styles.missingBody}>
-            Add EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY to Frontend/.env and restart Expo.
+            Set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY for your build (Frontend/.env locally, or EAS env /
+            eas.json for APK). Then rebuild — env is baked in at build time, not read from the phone.
           </Text>
         </View>
       </InterFontGate>

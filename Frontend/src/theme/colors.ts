@@ -26,11 +26,23 @@ export const chatComposerBar = '#f3f1ed';
 export {
   themeCard,
   themeGreen,
+  themeInk,
   themeMuted,
   themeOrange,
   themePageBg,
   themePrimary,
 } from './courseTheme';
 
+/** Solid red for destructive actions (e.g. Delete). Use with white/cascadingWhite labels. */
+export const themeDanger = '#b3261e';
+
 /** Soft lavender fill for segmented controls, chips, and muted rows. */
 export const themeSurfaceMuted = 'rgba(113, 110, 255, 0.09)';
+
+/** Pastel action buttons (owner cards, e.g. wanted post Edit / fulfilled). */
+export const pastelLavenderFill = '#F0F2FF';
+export const pastelLavenderBorder = '#e4e7f5';
+/** Destructive-adjacent but soft (Delete on light rose). */
+export const pastelRoseFill = '#FFF0F0';
+export const pastelRoseBorder = '#f0e0e0';
+export const pastelDangerText = '#802020';

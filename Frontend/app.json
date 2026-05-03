@@ -28,15 +28,25 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "lk.booklink.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "3e8bb706-2e08-468e-8e00-655c4e481835"
+      }
+    },
+    "owner": "jayashan"
   }
 }

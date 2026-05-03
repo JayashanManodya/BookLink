@@ -210,12 +210,11 @@ export function BookDetailScreen({ navigation, route }: Props) {
             {sub}
           </Text>
         </View>
-        <View style={styles.specRowRight}>
-          {rightLabel ? (
+        {rightLabel ? (
+          <View style={styles.specRowRight}>
             <Text style={[styles.specRowMeta, { fontFamily: font.medium }]}>{rightLabel}</Text>
-          ) : null}
-          <Ionicons name="download-outline" size={20} color={themeMuted} />
-        </View>
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -399,7 +398,7 @@ export function BookDetailScreen({ navigation, route }: Props) {
             <View style={[styles.gateBox, cardShadow]}>
               <Text style={[styles.gateTitle, { fontFamily: font.bold }]}>Sign in to request this book</Text>
               <Text style={[styles.gateBody, { fontFamily: font.regular }]}>Connect with Google so owners know who is asking.</Text>
-              <SignInWithGoogleButton />
+              <SignInWithGoogleButton variant="accent" />
             </View>
           ) : (
             <Pressable

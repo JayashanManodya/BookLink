@@ -1,9 +1,9 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
-import { cascadingWhite } from '../theme/colors';
+import { cascadingWhite, themePrimary, themeSurfaceMuted } from '../theme/colors';
 import { font } from '../theme/typography';
 import { GoogleGLogo } from './GoogleGLogo';
 
-export type GoogleBrandVariant = 'outline' | 'neutral' | 'dark';
+export type GoogleBrandVariant = 'outline' | 'neutral' | 'dark' | 'accent';
 
 type Props = {
   onPress: () => void;
@@ -22,7 +22,8 @@ export function GoogleBrandSignInButton({
   accessibilityLabel = 'Sign in with Google',
 }: Props) {
   const v = VARIANTS[variant];
-  const spinnerColor = variant === 'dark' ? cascadingWhite : v.spinnerColor;
+  const spinnerColor =
+    variant === 'dark' ? cascadingWhite : variant === 'accent' ? themePrimary : v.spinnerColor;
 
   return (
     <Pressable
@@ -82,6 +83,21 @@ const VARIANTS: Record<
     },
     labelColor: cascadingWhite,
     spinnerColor: cascadingWhite,
+  },
+  /** BookLink course UI — purple accent; works on lavender-tint cards (e.g. book detail gate). */
+  accent: {
+    pill: {
+      backgroundColor: themeSurfaceMuted,
+      borderWidth: StyleSheet.hairlineWidth * 2,
+      borderColor: 'rgba(113, 110, 255, 0.42)',
+      shadowColor: themePrimary,
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.18,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    labelColor: '#1f1f1f',
+    spinnerColor: themePrimary,
   },
 };
 

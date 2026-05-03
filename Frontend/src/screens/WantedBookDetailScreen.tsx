@@ -18,7 +18,19 @@ import { confirmDestructive } from '../lib/platformAlert';
 import type { WishlistStackParamList } from '../navigation/wishlistStackTypes';
 import type { WishlistItem } from '../types/wishlist';
 import type { WishlistHelpThread } from '../types/wishlistThread';
-import { cascadingWhite, dreamland, lead, textSecondary, warmHaze, themePageBg, themePrimary, themeSurfaceMuted } from '../theme/colors';
+import {
+  cascadingWhite,
+  dreamland,
+  lead,
+  textSecondary,
+  themeDanger,
+  themeGreen,
+  themeInk,
+  themeOrange,
+  themePageBg,
+  themePrimary,
+  warmHaze,
+} from '../theme/colors';
 import { cardShadow } from '../theme/shadows';
 
 type Props = NativeStackScreenProps<WishlistStackParamList, 'WantedBookDetail'>;
@@ -186,28 +198,33 @@ export function WantedBookDetailScreen({ navigation, route }: Props) {
               When someone has this book, they can message you here. Open a thread below to reply.
             </Text>
             {item.status === 'open' ? (
-              <View style={styles.ownerActionsRow}>
+              <View style={styles.ownerActionsCol}>
+                <View style={styles.ownerActionsTopRow}>
+                  <Pressable
+                    style={[styles.solidEditBtn, styles.actionBtnGrow, cardShadow]}
+                    onPress={() => navigation.navigate('PostWanted', { editItemId: item._id })}
+                  >
+                    <Ionicons name="create-outline" size={16} color={themeInk} />
+                    <Text style={styles.solidEditBtnTxt}>Edit</Text>
+                  </Pressable>
+                  <Pressable style={[styles.solidDangerBtn, styles.actionBtnGrow, cardShadow]} onPress={confirmDelete}>
+                    <Ionicons name="trash-outline" size={16} color={cascadingWhite} />
+                    <Text style={styles.solidDangerBtnTxt}>Delete</Text>
+                  </Pressable>
+                </View>
                 <Pressable
-                  style={[styles.secondaryBtn, cardShadow]}
-                  onPress={() => navigation.navigate('PostWanted', { editItemId: item._id })}
+                  style={[styles.solidFulfilledBtn, styles.solidBtnFull, cardShadow]}
+                  onPress={() => markFulfilled()}
                 >
-                  <Ionicons name="create-outline" size={16} color={lead} />
-                  <Text style={styles.secondaryBtnTxt}>Edit</Text>
-                </Pressable>
-                <Pressable style={[styles.deleteBtn, cardShadow]} onPress={confirmDelete}>
-                  <Ionicons name="trash-outline" size={16} color="#7a2e2e" />
-                  <Text style={styles.deleteBtnTxt}>Delete</Text>
-                </Pressable>
-                <Pressable style={[styles.secondaryBtn, cardShadow]} onPress={() => markFulfilled()}>
-                  <Text style={styles.secondaryBtnTxt}>Mark as fulfilled</Text>
+                  <Text style={styles.solidFulfilledBtnTxt}>Mark as fulfilled</Text>
                 </Pressable>
               </View>
             ) : (
               <View style={styles.ownerActionsRow}>
                 <Text style={styles.closed}>This post is fulfilled.</Text>
-                <Pressable style={[styles.deleteBtn, cardShadow]} onPress={confirmDelete}>
-                  <Ionicons name="trash-outline" size={16} color="#7a2e2e" />
-                  <Text style={styles.deleteBtnTxt}>Delete</Text>
+                <Pressable style={[styles.solidDangerBtn, cardShadow]} onPress={confirmDelete}>
+                  <Ionicons name="trash-outline" size={16} color={cascadingWhite} />
+                  <Text style={styles.solidDangerBtnTxt}>Delete</Text>
                 </Pressable>
               </View>
             )}
@@ -291,31 +308,47 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: 17, fontWeight: '800', color: lead },
   cardBody: { fontSize: 14, color: textSecondary, lineHeight: 20 },
-  ownerActionsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  secondaryBtn: {
+  ownerActionsCol: { gap: 10 },
+  ownerActionsTopRow: { flexDirection: 'row', gap: 8, alignItems: 'stretch' },
+  ownerActionsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
+  actionBtnGrow: { flex: 1, minWidth: 0, justifyContent: 'center' },
+  solidEditBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: themeSurfaceMuted,
-    paddingHorizontal: 16,
+    backgroundColor: themeOrange,
+    paddingHorizontal: 14,
     paddingVertical: 12,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
+    borderRadius: 12,
+    justifyContent: 'center',
   },
-  secondaryBtnTxt: { fontSize: 14, fontWeight: '800', color: lead },
-  deleteBtn: {
+  solidEditBtnTxt: { fontSize: 14, fontWeight: '800', color: themeInk },
+  solidFulfilledBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#fdeaea',
-    paddingHorizontal: 16,
+    backgroundColor: themeGreen,
+    paddingHorizontal: 14,
     paddingVertical: 12,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#e8bcbc',
+    borderRadius: 12,
+    justifyContent: 'center',
   },
-  deleteBtnTxt: { fontSize: 14, fontWeight: '800', color: '#7a2e2e' },
+  solidFulfilledBtnTxt: { fontSize: 14, fontWeight: '800', color: cascadingWhite },
+  solidBtnFull: {
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+  },
+  solidDangerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: themeDanger,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    justifyContent: 'center',
+  },
+  solidDangerBtnTxt: { fontSize: 14, fontWeight: '800', color: cascadingWhite },
   closed: { fontSize: 14, color: warmHaze, fontWeight: '600', flex: 1 },
   noThreads: { fontSize: 14, color: warmHaze },
   threadRow: {
@@ -339,5 +372,5 @@ const styles = StyleSheet.create({
   },
   primaryBtnTxt: { fontSize: 16, fontWeight: '800', color: lead },
   hint: { fontSize: 13, color: textSecondary, lineHeight: 19 },
-  error: { color: '#b3261e', padding: 20 },
+  error: { color: themeDanger, padding: 20 },
 });
