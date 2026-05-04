@@ -57,6 +57,12 @@ export function formatChatListRelative(iso: string): string {
   }
 }
 
+function formatUnreadBadge(n: number): string {
+  if (n < 1) return '';
+  if (n > 99) return '99+';
+  return String(n);
+}
+
 type Props = {
   title: string;
   preview: string;
@@ -71,6 +77,8 @@ type Props = {
   contextHint?: string;
   /** Course-style messenger inbox (flat white rows, relative time) */
   variant?: 'default' | 'inbox';
+  /** Purple pill under timestamp (unread count). */
+  unreadBadgeCount?: number;
 };
 
 export function ChatListRow({
@@ -85,9 +93,11 @@ export function ChatListRow({
   onPress,
   contextHint,
   variant = 'default',
+  unreadBadgeCount,
 }: Props) {
   const { prefix, body } = previewParts(myUserId, lastMessageSenderClerkUserId, peerNameForPrefix, preview);
   const dateLabel = variant === 'inbox' ? formatChatListRelative(dateIso) : formatChatListDate(dateIso);
+  const showBadge = typeof unreadBadgeCount === 'number' && unreadBadgeCount > 0;
 
   return (
     <Pressable
@@ -114,7 +124,14 @@ export function ChatListRow({
           <Text style={[styles.title, variant === 'inbox' && styles.titleInbox]} numberOfLines={1}>
             {title}
           </Text>
-          <Text style={[styles.date, variant === 'inbox' && styles.dateInbox]}>{dateLabel}</Text>
+          <View style={styles.rightMeta}>
+            <Text style={[styles.date, variant === 'inbox' && styles.dateInbox]}>{dateLabel}</Text>
+            {showBadge ? (
+              <View style={styles.unreadPill} accessibilityLabel={`${unreadBadgeCount} unread`}>
+                <Text style={styles.unreadPillTxt}>{formatUnreadBadge(unreadBadgeCount)}</Text>
+              </View>
+            ) : null}
+          </View>
         </View>
         <Text style={[styles.preview, variant === 'inbox' && styles.previewInbox]} numberOfLines={variant === 'inbox' ? 1 : 2}>
           {prefix ? (
@@ -178,6 +195,26 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 10,
+  },
+  rightMeta: {
+    alignItems: 'flex-end',
+    gap: 4,
+    flexShrink: 0,
+  },
+  unreadPill: {
+    minWidth: 22,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: themePrimary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadPillTxt: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: cascadingWhite,
+    fontVariant: ['tabular-nums'],
   },
   title: {
     flex: 1,

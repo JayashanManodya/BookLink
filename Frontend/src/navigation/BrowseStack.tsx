@@ -3,6 +3,7 @@ import { AddBookScreen } from '../screens/AddBookScreen';
 import { BookDetailScreen } from '../screens/BookDetailScreen';
 import { BrowseAllBooksScreen } from '../screens/BrowseAllBooksScreen';
 import { BrowseListScreen } from '../screens/BrowseListScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { RequestExchangeScreen } from '../screens/RequestExchangeScreen';
 import { UserReviewsScreen } from '../screens/UserReviewsScreen';
 import type { BrowseStackParamList } from './browseStackTypes';
@@ -23,6 +24,7 @@ export function BrowseStack() {
       }}
     >
       <Stack.Screen name="BrowseList" component={BrowseListScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="BrowseAllBooks" component={BrowseAllBooksScreen} />
       <Stack.Screen name="BookDetail" component={BookDetailScreen} />
       <Stack.Screen name="AddBook" component={AddBookScreen} />

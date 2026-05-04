@@ -114,6 +114,7 @@ export function RequestChatScreen({ navigation, route }: Props) {
       setRequest(reqRes.data.request ?? null);
       setMessages(msgRes.data.messages ?? []);
       setError(null);
+      void api.post(`/api/chats/exchange/${requestId}/read`).catch(() => {});
     } catch (e: unknown) {
       setError(apiErrorMessage(e, 'Could not load messages'));
     } finally {

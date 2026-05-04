@@ -24,6 +24,7 @@ import { browseAllBooksParamsFromUi, type BrowseStackParamList } from '../naviga
 import {
   cascadingWhite,
   chineseSilver,
+  themeDanger,
 } from '../theme/colors';
 import {
   themeCard,
@@ -114,6 +115,7 @@ type OwnerReviewSummary = { averageRating: number | null; reviewCount: number };
 export function BrowseListScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { isSignedIn } = useAuth();
+  const [unreadChatTotal, setUnreadChatTotal] = useState(0);
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -192,11 +194,25 @@ export function BrowseListScreen({ navigation }: Props) {
     }
   }, []);
 
+  const loadUnreadChatTotal = useCallback(async () => {
+    if (!isSignedIn) {
+      setUnreadChatTotal(0);
+      return;
+    }
+    try {
+      const res = await api.get<{ totalUnread: number }>('/api/chats/unread-count');
+      setUnreadChatTotal(res.data.totalUnread ?? 0);
+    } catch {
+      setUnreadChatTotal(0);
+    }
+  }, [isSignedIn]);
+
   useFocusEffect(
     useCallback(() => {
       void load();
       void loadWanted();
-    }, [load, loadWanted])
+      void loadUnreadChatTotal();
+    }, [load, loadWanted, loadUnreadChatTotal])
   );
 
   useEffect(() => {
@@ -457,10 +473,21 @@ export function BrowseListScreen({ navigation }: Props) {
               </Pressable>
               <View style={styles.heroTopSpacer} />
               <View style={styles.notifWrap}>
-                <Pressable accessibilityLabel="Notifications" style={styles.heroIconBtn}>
+                <Pressable
+                  accessibilityLabel="Notifications"
+                  style={styles.heroIconBtn}
+                  onPress={() => navigation.navigate('Notifications')}
+                  hitSlop={8}
+                >
                   <Ionicons name="notifications-outline" size={22} color={cascadingWhite} />
                 </Pressable>
-                <View style={styles.notifDot} pointerEvents="none" />
+                {isSignedIn && unreadChatTotal > 0 ? (
+                  <View style={styles.notifBadge} pointerEvents="none">
+                    <Text style={[styles.notifBadgeTxt, { fontFamily: font.semi }]}>
+                      {unreadChatTotal > 99 ? '99+' : unreadChatTotal}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
             </View>
 
@@ -813,16 +840,25 @@ const styles = StyleSheet.create({
   heroIconBtnMuted: { opacity: 0.92 },
   heroTopSpacer: { flex: 1 },
   notifWrap: { position: 'relative' },
-  notifDot: {
+  notifBadge: {
     position: 'absolute',
-    top: -2,
-    right: -2,
-    width: 11,
-    height: 11,
-    borderRadius: 6,
-    backgroundColor: themeGreen,
+    top: -4,
+    right: -4,
+    minWidth: 20,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: themeDanger,
     borderWidth: 2,
-    borderColor: themePrimary,
+    borderColor: 'rgba(255,255,255,0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifBadgeTxt: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: cascadingWhite,
+    fontVariant: ['tabular-nums'],
   },
   heroHeadingBlock: {
     alignSelf: 'stretch',

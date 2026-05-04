@@ -25,6 +25,8 @@ const wishlistThreadSchema = new mongoose.Schema(
     meetupLongitude: { type: Number },
     meetupScheduledAt: { type: Date },
     meetupContactNumber: { type: String, trim: true, default: '' },
+    seekerLastReadAt: { type: Date, default: null },
+    helperLastReadAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

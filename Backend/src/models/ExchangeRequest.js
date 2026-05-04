@@ -24,6 +24,8 @@ const exchangeRequestSchema = new mongoose.Schema(
       index: true,
     },
     requesterConfirmedAt: { type: Date, default: null },
+    ownerLastReadAt: { type: Date, default: null },
+    requesterLastReadAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

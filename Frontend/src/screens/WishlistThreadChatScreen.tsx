@@ -115,6 +115,7 @@ export function WishlistThreadChatScreen({ navigation, route }: Props) {
       setThread(threadRes.data.thread ?? null);
       setMessages(msgRes.data.messages ?? []);
       setError(null);
+      void api.post(`/api/chats/wishlist-thread/${threadId}/read`).catch(() => {});
     } catch (e: unknown) {
       setError(apiErrorMessage(e, 'Could not load messages'));
     } finally {

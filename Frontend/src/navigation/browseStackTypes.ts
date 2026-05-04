@@ -30,6 +30,7 @@ export function browseAllBooksParamsFromUi(snapshot: {
 
 export type BrowseStackParamList = {
   BrowseList: undefined;
+  Notifications: undefined;
   BrowseAllBooks: BrowseAllBooksFilters | undefined;
   BookDetail: { bookId: string };
   AddBook: undefined;

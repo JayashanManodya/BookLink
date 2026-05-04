@@ -41,10 +41,12 @@ type InboxChatExchange = {
   lastAt: string;
   status: string;
   lastMessageSenderClerkUserId?: string | null;
+  unreadCount?: number;
 };
 
 type InboxChatWishlist = {
   kind: 'wishlist';
+  wishlistRole?: 'poster' | 'helper';
   threadId: string;
   itemTitle: string;
   peerName: string;
@@ -52,6 +54,7 @@ type InboxChatWishlist = {
   preview: string;
   lastAt: string;
   lastMessageSenderClerkUserId?: string | null;
+  unreadCount?: number;
 };
 
 type InboxChat = InboxChatExchange | InboxChatWishlist;
