@@ -23,6 +23,8 @@ export type ExchangeRequest = {
   requesterConfirmedAt?: string | null;
   /** True when a review exists for this exchange (one per swap). */
   hasExchangeReview?: boolean;
+  /** When you're the reader who left the review, use this to open the edit screen (see Exchange detail or list). */
+  myExchangeReviewId?: string | null;
   /** Your report id for this exchange, if you filed one. */
   myExchangeReportId?: string | null;
   /** For owner/lister cards: requester already filed a report for this exchange. */

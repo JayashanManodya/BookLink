@@ -11,7 +11,7 @@ const exchangeReportSchema = new mongoose.Schema(
     reporterClerkUserId: { type: String, required: true, index: true },
     /** What went wrong (condition, no-show, etc.) */
     details: { type: String, trim: true, default: '', maxlength: 4000 },
-    /** Required when creating; stored as Cloudinary URL */
+    /** Optional; stored as Cloudinary URL when provided */
     evidencePhoto: { type: String, trim: true, default: '' },
     /** Reserved for future moderation; reporters only see their own rows */
     status: {

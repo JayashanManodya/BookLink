@@ -121,18 +121,18 @@ export async function createExchangeReport(req, res, next) {
     if (chk.error) {
       return res.status(chk.status).json({ error: chk.error });
     }
-    const photo = typeof evidencePhoto === 'string' ? evidencePhoto.trim() : '';
-    if (!photo) {
-      return res.status(400).json({ error: 'evidencePhoto is required (upload an image first)' });
-    }
     const text = typeof details === 'string' ? details.trim().slice(0, 4000) : '';
+    if (!text) {
+      return res.status(400).json({ error: 'details is required' });
+    }
+    const photo = typeof evidencePhoto === 'string' ? evidencePhoto.trim().slice(0, 2000) : '';
     let doc;
     try {
       doc = await ExchangeReport.create({
         exchangeRequestId: chk.row._id,
         reporterClerkUserId: req.clerkUserId,
         details: text,
-        evidencePhoto: photo.slice(0, 2000),
+        evidencePhoto: photo,
       });
     } catch (e) {
       if (e && e.code === 11000) {
@@ -278,11 +278,10 @@ export async function updateExchangeReport(req, res, next) {
       row.details = details.trim().slice(0, 4000);
     }
     if (typeof evidencePhoto === 'string') {
-      const p = evidencePhoto.trim();
-      if (!p) {
-        return res.status(400).json({ error: 'evidencePhoto cannot be empty; remove the image only by replacing it' });
-      }
-      row.evidencePhoto = p.slice(0, 2000);
+      row.evidencePhoto = evidencePhoto.trim().slice(0, 2000);
+    }
+    if (!String(row.details ?? '').trim()) {
+      return res.status(400).json({ error: 'details is required' });
     }
     await row.save();
     const exAfter = await ExchangeRequest.findById(row.exchangeRequestId).lean();

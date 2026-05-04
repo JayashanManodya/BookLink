@@ -134,26 +134,27 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
 
   const submit = async () => {
     if (!canEditReport || isListerRoute) return;
+    const comment = details.trim();
+    if (!comment) {
+      alertOk('Comment required', 'Describe what happened so we can understand the issue.');
+      return;
+    }
     let evidenceUrl = existingEvidenceUrl;
     if (photoUri) {
       evidenceUrl = await uploadEvidence();
-    }
-    if (!evidenceUrl) {
-      alertOk('Photo required', 'Add an evidence photo for this report.');
-      return;
     }
     setBusy(true);
     try {
       if (reportId) {
         await api.patch(`/api/reports/${reportId}`, {
-          details: details.trim(),
+          details: comment,
           evidencePhoto: evidenceUrl,
         });
         alertOk('Saved', 'Your report was updated.', () => navigation.goBack());
       } else {
         await api.post('/api/reports', {
           exchangeRequestId,
-          details: details.trim(),
+          details: comment,
           evidencePhoto: evidenceUrl,
         });
         alertOk('Sent', 'We recorded your report. Receipt confirmation is not available for this swap.', () =>
@@ -214,7 +215,7 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
               <Text style={styles.chatWithReaderTxt}>Message reader</Text>
             </Pressable>
           ) : null}
-          <Text style={styles.label}>What happened?</Text>
+          <Text style={styles.label}>What happened? (required)</Text>
           {readOnly ? (
             <Text style={styles.readOnlyDetails}>{details || '—'}</Text>
           ) : (
@@ -228,7 +229,7 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
               textAlignVertical="top"
             />
           )}
-          <Text style={styles.label}>Evidence photo</Text>
+          <Text style={styles.label}>Evidence photo (optional)</Text>
           {readOnly ? (
             existingEvidenceUrl ? (
               <Image source={{ uri: existingEvidenceUrl }} style={styles.evidenceImg} resizeMode="cover" />
@@ -244,7 +245,7 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
                 setPhotoMime(null);
                 setExistingEvidenceUrl('');
               }}
-              emptyHint="Tap to add a photo (required)"
+              emptyHint="Tap to add a photo (optional)"
             />
           )}
           {!readOnly ? (

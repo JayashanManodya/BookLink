@@ -262,7 +262,7 @@ export function PostWantedBookScreen({ navigation, route }: Props) {
           }}
           emptyHint="Tap to add book photo"
         />
-        <Field label="Title" value={title} onChangeText={setTitle} placeholder="ICT Revision Guide 2024" />
+        <Field label="Title" required value={title} onChangeText={setTitle} placeholder="ICT Revision Guide 2024" />
         <Field label="Author (optional)" value={author} onChangeText={(v) => setAuthor(filterToLettersOnlyNameText(v))} />
         <Field
           label="Description (optional)"
@@ -378,6 +378,7 @@ export function PostWantedBookScreen({ navigation, route }: Props) {
 
 function Field({
   label,
+  required,
   value,
   onChangeText,
   placeholder,
@@ -386,6 +387,7 @@ function Field({
   maxLength,
 }: {
   label: string;
+  required?: boolean;
   value: string;
   onChangeText: (t: string) => void;
   placeholder?: string;
@@ -395,7 +397,10 @@ function Field({
 }) {
   return (
     <View style={{ width: '100%', gap: 6 }}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>
+        {label}
+        {required ? <Text style={styles.reqMark}>*</Text> : null}
+      </Text>
       <TextInput
         value={value}
         onChangeText={onChangeText}

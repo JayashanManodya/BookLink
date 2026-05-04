@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,12 +10,13 @@ import {
   View,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, apiErrorMessage } from '../lib/api';
 import { confirmDestructive } from '../lib/platformAlert';
 import type { ProfileStackParamList } from '../navigation/profileStackTypes';
-import { cascadingWhite, dreamland, lead, textSecondary, warmHaze, themePageBg, themePrimary } from '../theme/colors';
+import { cascadingWhite, dreamland, lead, textSecondary, themePageBg, themePrimary } from '../theme/colors';
 import { cardShadow } from '../theme/shadows';
 import type { Review } from '../types/review';
 
@@ -40,9 +41,11 @@ export function MyReviewsScreen({ navigation }: Props) {
     }
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load])
+  );
 
   const remove = (id: string) => {
     confirmDestructive({
@@ -69,7 +72,8 @@ export function MyReviewsScreen({ navigation }: Props) {
           <Text style={styles.backText}>Back</Text>
         </Pressable>
       </View>
-      <Text style={styles.title}>Reviews I gave</Text>
+      <Text style={styles.title}>Reviews I wrote</Text>
+      <Text style={styles.subtitle}>Tap Edit on a row to update your rating or comment.</Text>
       {loading ? (
         <ActivityIndicator style={{ marginTop: 24 }} color={themePrimary} />
       ) : error ? (
@@ -83,10 +87,27 @@ export function MyReviewsScreen({ navigation }: Props) {
               <View key={r._id} style={[styles.card, cardShadow]}>
                 <View style={styles.row}>
                   <Text style={styles.meta}>{`${r.rating} / 5`}</Text>
-                  <Pressable onPress={() => remove(r._id)} hitSlop={8}>
-                    <Ionicons name="trash-outline" size={20} color="#b3261e" />
-                  </Pressable>
+                  <View style={styles.actions}>
+                    <Pressable
+                      onPress={() =>
+                        navigation.navigate('WriteReview', { editReviewId: r._id, editPrefillReview: r })
+                      }
+                      hitSlop={8}
+                      style={styles.editBtn}
+                    >
+                      <Ionicons name="pencil-outline" size={20} color={themePrimary} />
+                      <Text style={styles.editTxt}>Edit</Text>
+                    </Pressable>
+                    <Pressable onPress={() => remove(r._id)} hitSlop={8}>
+                      <Ionicons name="trash-outline" size={20} color="#b3261e" />
+                    </Pressable>
+                  </View>
                 </View>
+                {r.revieweeDisplayName ? (
+                  <Text style={styles.forLine} numberOfLines={1}>
+                    For {r.revieweeDisplayName}
+                  </Text>
+                ) : null}
                 {r.comment ? <Text style={styles.comment}>{r.comment}</Text> : null}
                 {r.evidencePhoto ? (
                   <Image source={{ uri: r.evidencePhoto }} style={styles.evidence} resizeMode="cover" />
@@ -106,6 +127,14 @@ const styles = StyleSheet.create({
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, alignSelf: 'flex-start' },
   backText: { fontSize: 16, fontWeight: '600', color: lead },
   title: { fontSize: 22, fontWeight: '800', color: lead, paddingHorizontal: 20, marginTop: 4 },
+  subtitle: {
+    fontSize: 14,
+    color: textSecondary,
+    paddingHorizontal: 20,
+    marginTop: 6,
+    marginBottom: 4,
+    lineHeight: 20,
+  },
   list: { padding: 20, gap: 12, paddingBottom: 40 },
   empty: { fontSize: 15, color: textSecondary },
   card: {
@@ -117,6 +146,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  editTxt: { fontSize: 14, fontWeight: '700', color: themePrimary },
+  forLine: { fontSize: 13, color: textSecondary, fontWeight: '600' },
   meta: { fontSize: 15, fontWeight: '800', color: lead },
   comment: { fontSize: 14, color: textSecondary, lineHeight: 20 },
   evidence: { width: '100%', height: 120, borderRadius: 12, backgroundColor: '#eee' },

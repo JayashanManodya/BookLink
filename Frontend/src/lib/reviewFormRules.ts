@@ -1,4 +1,4 @@
-/** Keep `REVIEW_COMMENT_*` aligned with Backend `reviewController.submitReview`. */
+/** Keep `REVIEW_COMMENT_*` aligned with Backend `reviewController` submit/update. */
 
 export const REVIEW_COMMENT_MIN_LENGTH = 10;
 export const REVIEW_COMMENT_MAX_LENGTH = 4000;

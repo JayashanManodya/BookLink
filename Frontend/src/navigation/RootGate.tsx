@@ -1,7 +1,8 @@
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { useAuth } from '@clerk/clerk-expo';
+import { useEffect, useRef } from 'react';
 import { LandingScreen } from '../screens/LandingScreen';
 import { MainTabs } from './MainTabs';
 import { themePrimary, themePageBg } from '../theme/courseTheme';
@@ -14,6 +15,19 @@ const navTheme = {
 /** Shows landing until Clerk is ready and the user signs in; then main tabs + API token wiring. */
 export function RootGate() {
   const { isSignedIn, isLoaded } = useAuth();
+  const prevSignedIn = useRef<boolean | undefined>(undefined);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    if (typeof document === 'undefined') return;
+    const wasOut = prevSignedIn.current === false;
+    prevSignedIn.current = Boolean(isSignedIn);
+    if (!wasOut || !isSignedIn) return;
+    requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) active.blur();
+    });
+  }, [isSignedIn]);
 
   if (!isLoaded) {
     return (

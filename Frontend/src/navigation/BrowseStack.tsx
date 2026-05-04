@@ -8,6 +8,7 @@ import { UserReviewsScreen } from '../screens/UserReviewsScreen';
 import type { BrowseStackParamList } from './browseStackTypes';
 
 import { themePageBg } from '../theme/courseTheme';
+import { webStackSceneOptions } from './webNavigationA11y';
 
 const Stack = createNativeStackNavigator<BrowseStackParamList>();
 
@@ -15,7 +16,11 @@ export function BrowseStack() {
   return (
     <Stack.Navigator
       id="BrowseStackRoot"
-      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: themePageBg } }}
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: themePageBg },
+        ...webStackSceneOptions,
+      }}
     >
       <Stack.Screen name="BrowseList" component={BrowseListScreen} />
       <Stack.Screen name="BrowseAllBooks" component={BrowseAllBooksScreen} />

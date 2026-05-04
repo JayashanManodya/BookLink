@@ -8,6 +8,7 @@ import { ReportExchangeScreen } from '../screens/ReportExchangeScreen';
 import type { RequestsStackParamList } from './requestsStackTypes';
 
 import { themePageBg } from '../theme/courseTheme';
+import { webStackSceneOptions } from './webNavigationA11y';
 
 const Stack = createNativeStackNavigator<RequestsStackParamList>();
 
@@ -16,7 +17,11 @@ export function RequestsStack() {
     <Stack.Navigator
       id="RequestsStackRoot"
       initialRouteName="ChatsInbox"
-      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: themePageBg } }}
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: themePageBg },
+        ...webStackSceneOptions,
+      }}
     >
       <Stack.Screen name="ChatsInbox" component={ChatsInboxScreen} />
       <Stack.Screen name="RequestsHome" component={RequestsScreen} />

@@ -152,6 +152,7 @@ export function MainTabs() {
           headerShown: false,
           tabBarShowLabel: false,
           sceneStyle: { paddingBottom: contentBottomPad, backgroundColor: themePageBg },
+          ...(Platform.OS === 'web' ? { detachInactiveScreens: false as const } : {}),
         }}
       >
         <Tab.Screen

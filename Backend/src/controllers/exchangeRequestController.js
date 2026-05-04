@@ -86,6 +86,8 @@ function serializeRequest(doc, bookLean, profileById = {}, extra = {}) {
     status: o.status,
     requesterConfirmedAt: o.requesterConfirmedAt ? new Date(o.requesterConfirmedAt).toISOString() : null,
     hasExchangeReview: Boolean(extra.hasExchangeReview),
+    /** When you're the reviewer (reader), id of your review for this swap — open edit UI. */
+    myExchangeReviewId: extra.myExchangeReviewId != null ? String(extra.myExchangeReviewId) : null,
     myExchangeReportId: extra.myExchangeReportId != null ? String(extra.myExchangeReportId) : null,
     /** For lister view: requester filed a report for this accepted swap. */
     hasReportFromRequester: Boolean(extra.hasReportFromRequester),
@@ -147,9 +149,16 @@ export async function getExchangeRequestById(req, res, next) {
       .select('_id')
       .lean();
     const requesterReportExists = Boolean(requesterReportRow);
+    const myExchangeReviewRow = await Review.findOne({
+      exchangeRequestId: chk.row._id,
+      reviewerClerkUserId: req.clerkUserId,
+    })
+      .select('_id')
+      .lean();
     return res.json({
       request: serializeRequest(chk.row, book, userProfiles, {
         hasExchangeReview,
+        myExchangeReviewId: myExchangeReviewRow?._id ?? null,
         myExchangeReportId: myReport?._id ?? null,
         hasReportFromRequester: requesterReportExists,
         requesterReportId: requesterReportRow?._id ?? null,
@@ -187,6 +196,15 @@ export async function listExchangeRequests(req, res, next) {
     const myReportIdByExchangeId = Object.fromEntries(
       myReportRows.map((rep) => [String(rep.exchangeRequestId), String(rep._id)])
     );
+    const myReviewRows = await Review.find({
+      exchangeRequestId: { $in: rowIds },
+      reviewerClerkUserId: me,
+    })
+      .select('exchangeRequestId _id')
+      .lean();
+    const myReviewIdByExchangeId = Object.fromEntries(
+      myReviewRows.map((rev) => [String(rev.exchangeRequestId), String(rev._id)])
+    );
     const requesterReportRows = await ExchangeReport.find({ exchangeRequestId: { $in: rowIds } })
       .select('exchangeRequestId reporterClerkUserId _id')
       .lean();
@@ -203,6 +221,7 @@ export async function listExchangeRequests(req, res, next) {
     const requests = rows.map((r) =>
       serializeRequest(r, byId[String(r.bookId)], userProfiles, {
         hasExchangeReview: reviewedIds.has(String(r._id)),
+        myExchangeReviewId: myReviewIdByExchangeId[String(r._id)] ?? null,
         myExchangeReportId: myReportIdByExchangeId[String(r._id)] ?? null,
         hasReportFromRequester: requesterReportExchangeIds.has(String(r._id)),
         requesterReportId: requesterReportIdByExchangeId[String(r._id)] ?? null,
@@ -554,9 +573,16 @@ export async function confirmExchangeRequestReceipt(req, res, next) {
     })
       .select('_id')
       .lean();
+    const myExchangeReviewRow = await Review.findOne({
+      exchangeRequestId: row._id,
+      reviewerClerkUserId: req.clerkUserId,
+    })
+      .select('_id')
+      .lean();
     return res.json({
       request: serializeRequest(row.toObject(), book, userProfiles, {
         hasExchangeReview,
+        myExchangeReviewId: myExchangeReviewRow?._id ?? null,
         myExchangeReportId: myReport?._id ?? null,
         hasReportFromRequester: Boolean(requesterReportRow),
         requesterReportId: requesterReportRow?._id ?? null,

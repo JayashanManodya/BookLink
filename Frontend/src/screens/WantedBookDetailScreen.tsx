@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -45,30 +46,47 @@ export function WantedBookDetailScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.get<{ item: WishlistItem }>(`/api/wishlist/${wishlistItemId}`);
-      const it = res.data.item;
-      setItem(it);
-      if (userId && it.ownerClerkUserId === userId) {
-        const tr = await api.get<{ threads: WishlistHelpThread[] }>(`/api/wishlist/${wishlistItemId}/threads`);
-        setThreads(tr.data.threads ?? []);
-      } else {
-        setThreads([]);
-      }
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Could not load');
-    } finally {
-      setLoading(false);
-    }
-  }, [wishlistItemId, userId]);
+  const firstFocusForItem = useRef(true);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    firstFocusForItem.current = true;
+  }, [wishlistItemId]);
+
+  const load = useCallback(
+    async (opts?: { background?: boolean }) => {
+      const background = opts?.background ?? false;
+      if (!background) {
+        setLoading(true);
+      }
+      setError(null);
+      try {
+        const res = await api.get<{ item: WishlistItem }>(`/api/wishlist/${wishlistItemId}`);
+        const it = res.data.item;
+        setItem(it);
+        if (userId && it.ownerClerkUserId === userId) {
+          const tr = await api.get<{ threads: WishlistHelpThread[] }>(`/api/wishlist/${wishlistItemId}/threads`);
+          setThreads(tr.data.threads ?? []);
+        } else {
+          setThreads([]);
+        }
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'Could not load');
+      } finally {
+        if (!background) {
+          setLoading(false);
+        }
+      }
+    },
+    [wishlistItemId, userId]
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const background = !firstFocusForItem.current;
+      firstFocusForItem.current = false;
+      void load({ background });
+    }, [load])
+  );
 
   const isOwner = !!item && !!userId && item.ownerClerkUserId === userId;
   const canOffer = !!item && !!userId && !isOwner && item.status === 'open';

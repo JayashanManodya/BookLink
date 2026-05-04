@@ -1,4 +1,4 @@
-import type { ReportExchangeParams } from './sharedScreenTypes';
+import type { ReportExchangeParams, WriteReviewParams } from './sharedScreenTypes';
 
 export type RequestsStackParamList = {
   ChatsInbox: undefined;
@@ -6,10 +6,6 @@ export type RequestsStackParamList = {
   RequestsHome: { preferSentTab?: boolean } | undefined;
   ExchangeRequestDetail: { requestId: string };
   RequestChat: { requestId: string; bookTitle: string; peerName: string; peerAvatarUrl?: string };
-  WriteReview: {
-    exchangeRequestId: string;
-    revieweeClerkUserId: string;
-    revieweeName: string;
-  };
+  WriteReview: WriteReviewParams;
   ReportExchange: ReportExchangeParams;
 };

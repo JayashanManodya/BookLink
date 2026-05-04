@@ -15,6 +15,24 @@ function normalizeExchangeRequestIdInput(raw) {
   return '';
 }
 
+/** Coerce review document id from body (strings or `{ $oid }`). */
+function normalizeReviewIdInput(raw) {
+  if (raw == null) return '';
+  if (typeof raw === 'string') return raw.trim();
+  if (typeof raw === 'object' && raw !== null && typeof raw.$oid === 'string') return raw.$oid.trim();
+  return '';
+}
+
+/** Which review to update (`POST /api/reviews`), first valid id wins. */
+function resolveUpdateReviewId(body) {
+  const b = body ?? {};
+  for (const key of ['updateReviewId', 'reviewId']) {
+    const s = normalizeReviewIdInput(b[key]);
+    if (s && mongoose.isValidObjectId(s)) return s;
+  }
+  return '';
+}
+
 async function displayNameFor(clerkUserId) {
   return (await listerFullDisplayNameFromClerk(clerkUserId)) || 'Reader';
 }
@@ -32,6 +50,7 @@ function serializeReview(doc, nameById = {}) {
     reviewerClerkUserId: o.reviewerClerkUserId,
     revieweeClerkUserId: o.revieweeClerkUserId,
     reviewerDisplayName: nameById[o.reviewerClerkUserId] || 'Reader',
+    revieweeDisplayName: nameById[o.revieweeClerkUserId] || 'Reader',
     exchangeRequestId: String(o.exchangeRequestId),
     rating: o.rating,
     comment: o.comment,
@@ -42,9 +61,68 @@ function serializeReview(doc, nameById = {}) {
   };
 }
 
+async function applyReviewUpdate(req, res, next, id) {
+  try {
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+    const rev = await Review.findById(id);
+    if (!rev) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    if (rev.reviewerClerkUserId !== req.clerkUserId) {
+      return res.status(403).json({ error: 'Only the reviewer can edit this review' });
+    }
+
+    const body = req.body ?? {};
+    const rv = Number(body.rating);
+    const rInt = Number.isFinite(rv) ? Math.round(rv) : NaN;
+    if (!Number.isFinite(rInt) || rInt < 1 || rInt > 5) {
+      return res.status(400).json({ error: 'rating must be an integer from 1 to 5' });
+    }
+
+    const commentTrimmed = typeof body.comment === 'string' ? body.comment.trim() : '';
+    if (commentTrimmed.length < REVIEW_COMMENT_MIN_LENGTH) {
+      return res.status(400).json({
+        error: `Comment must be at least ${REVIEW_COMMENT_MIN_LENGTH} characters (${REVIEW_COMMENT_MAX_LENGTH} max)`,
+      });
+    }
+    if (commentTrimmed.length > REVIEW_COMMENT_MAX_LENGTH) {
+      return res.status(400).json({ error: `Comment cannot exceed ${REVIEW_COMMENT_MAX_LENGTH} characters` });
+    }
+
+    let evidencePhoto = rev.evidencePhoto;
+    if (Object.prototype.hasOwnProperty.call(body, 'evidencePhoto')) {
+      evidencePhoto =
+        typeof body.evidencePhoto === 'string' ? body.evidencePhoto.trim().slice(0, 2048) : '';
+    }
+
+    rev.rating = rInt;
+    rev.comment = commentTrimmed.slice(0, REVIEW_COMMENT_MAX_LENGTH);
+    rev.evidencePhoto = evidencePhoto;
+    await rev.save();
+
+    const names = await namesForIds([rev.reviewerClerkUserId, rev.revieweeClerkUserId]);
+    return res.json({ review: serializeReview(rev, names) });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 export async function submitReview(req, res, next) {
   try {
     const body = req.body ?? {};
+    const updateIdResolved = resolveUpdateReviewId(body);
+    const sentUpdateHint =
+      !!(body && typeof body === 'object' && ('updateReviewId' in body || 'reviewId' in body));
+
+    if (sentUpdateHint) {
+      if (!updateIdResolved) {
+        return res.status(400).json({ error: 'Invalid review id for update.' });
+      }
+      return applyReviewUpdate(req, res, next, updateIdResolved);
+    }
+
     const exchangeRequestId = normalizeExchangeRequestIdInput(body.exchangeRequestId);
     const { revieweeClerkUserId, rating, comment, evidencePhoto } = body;
     if (!exchangeRequestId || !mongoose.isValidObjectId(exchangeRequestId)) {
@@ -158,6 +236,30 @@ export async function getReviewsForUser(req, res, next) {
   } catch (err) {
     return next(err);
   }
+}
+
+export async function getReviewById(req, res, next) {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+    const rev = await Review.findById(id).lean();
+    if (!rev) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    if (rev.reviewerClerkUserId !== req.clerkUserId) {
+      return res.status(403).json({ error: 'Only the reviewer can view this review for editing' });
+    }
+    const names = await namesForIds([rev.reviewerClerkUserId, rev.revieweeClerkUserId]);
+    return res.json({ review: serializeReview(rev, names) });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+export async function updateReview(req, res, next) {
+  return applyReviewUpdate(req, res, next, req.params.id);
 }
 
 export async function getMyGivenReviews(req, res, next) {

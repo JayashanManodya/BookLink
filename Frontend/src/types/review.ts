@@ -3,6 +3,7 @@ export type Review = {
   reviewerClerkUserId: string;
   revieweeClerkUserId: string;
   reviewerDisplayName?: string;
+  revieweeDisplayName?: string;
   exchangeRequestId: string;
   rating: number;
   comment: string;

@@ -426,7 +426,27 @@ export function ExchangeRequestDetailScreen({ navigation, route }: Props) {
                         <Text style={styles.reviewTxt}>Leave a review</Text>
                       </Pressable>
                     ) : (
-                      <Text style={styles.reviewDone}>You reviewed this exchange</Text>
+                      <>
+                        <Text style={styles.reviewDone}>
+                          <Ionicons name="checkmark-circle" size={13} color={themeGreen} /> You reviewed this exchange
+                        </Text>
+                        {r.myExchangeReviewId ? (
+                          <Pressable
+                            style={styles.reviewEditWide}
+                            onPress={() =>
+                              navigation.navigate('WriteReview', {
+                                editReviewId: r.myExchangeReviewId,
+                                exchangeRequestId: r._id,
+                                revieweeClerkUserId: r.ownerClerkUserId,
+                                revieweeName: r.ownerDisplayName || 'Lister',
+                              })
+                            }
+                          >
+                            <Ionicons name="pencil-outline" size={17} color={themeInk} />
+                            <Text style={styles.reviewEditWideTxt}>Edit your review</Text>
+                          </Pressable>
+                        ) : null}
+                      </>
                     )}
                   </>
                 )}
@@ -729,6 +749,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: REQ_SUBTEXT,
   },
+  reviewEditWide: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 4,
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignSelf: 'stretch',
+    backgroundColor: REQ_PURPLE_FILL,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: themePrimary,
+  },
+  reviewEditWideTxt: { fontSize: 14, fontWeight: '800', color: themeInk },
   confirmHint: { fontSize: 13, color: REQ_SUBTEXT, lineHeight: 18 },
   confirmTxt: { fontSize: 14, fontWeight: '800', color: cascadingWhite },
   confirmedDone: {

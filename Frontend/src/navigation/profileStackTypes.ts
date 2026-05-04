@@ -1,4 +1,4 @@
-import type { ReportExchangeParams, UserReviewsParams } from './sharedScreenTypes';
+import type { ReportExchangeParams, UserReviewsParams, WriteReviewParams } from './sharedScreenTypes';
 
 export type ProfileStackParamList = {
   ProfileHome: undefined;
@@ -10,6 +10,7 @@ export type ProfileStackParamList = {
   MyPoints: undefined;
   UserReviews: UserReviewsParams;
   MyReviews: undefined;
+  WriteReview: WriteReviewParams;
   MyReports: undefined;
   /** Reports readers filed on your accepted swaps (like a second inbox). */
   ListerReportsReceived: undefined;

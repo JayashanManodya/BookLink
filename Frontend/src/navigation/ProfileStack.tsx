@@ -11,9 +11,11 @@ import { EditListingScreen } from '../screens/EditListingScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { SubmitPointScreen } from '../screens/SubmitPointScreen';
 import { UserReviewsScreen } from '../screens/UserReviewsScreen';
+import { WriteReviewScreen } from '../screens/WriteReviewScreen';
 import type { ProfileStackParamList } from './profileStackTypes';
 
 import { themePageBg } from '../theme/courseTheme';
+import { webStackSceneOptions } from './webNavigationA11y';
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
 
@@ -21,7 +23,11 @@ export function ProfileStack() {
   return (
     <Stack.Navigator
       id="ProfileStackRoot"
-      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: themePageBg } }}
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: themePageBg },
+        ...webStackSceneOptions,
+      }}
     >
       <Stack.Screen name="ProfileHome" component={ProfileScreen} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
@@ -32,6 +38,7 @@ export function ProfileStack() {
       <Stack.Screen name="MyPoints" component={MyPointsScreen} />
       <Stack.Screen name="UserReviews" component={UserReviewsScreen} />
       <Stack.Screen name="MyReviews" component={MyReviewsScreen} />
+      <Stack.Screen name="WriteReview" component={WriteReviewScreen} />
       <Stack.Screen name="MyReports" component={MyReportsScreen} />
       <Stack.Screen name="ListerReportsReceived" component={ListerReportsReceivedScreen} />
       <Stack.Screen name="ReportExchange" component={ReportExchangeScreen} />
