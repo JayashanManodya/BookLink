@@ -214,9 +214,6 @@ export async function createWishlistItem(req, res, next) {
       return res.status(400).json({ error: 'Invalid publication year' });
     }
     const photoTrim = typeof wantedBookPhoto === 'string' ? wantedBookPhoto.trim() : '';
-    if (!photoTrim) {
-      return res.status(400).json({ error: 'wanted book photo is required' });
-    }
     const u = ['high', 'medium', 'low'].includes(urgency) ? urgency : 'medium';
     const ownerDisplayName = await shortDisplayName(req.clerkUserId);
     const item = await WishlistItem.create({
@@ -308,11 +305,7 @@ export async function updateWishlistItem(req, res, next) {
       item.status = status;
     }
     if (typeof wantedBookPhoto === 'string') {
-      const p = wantedBookPhoto.trim();
-      if (!p) {
-        return res.status(400).json({ error: 'wanted book photo is required' });
-      }
-      item.wantedBookPhoto = p;
+      item.wantedBookPhoto = wantedBookPhoto.trim();
     }
     if (typeof description === 'string') {
       item.description = description.trim();

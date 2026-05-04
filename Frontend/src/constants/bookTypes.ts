@@ -20,6 +20,7 @@ export const BOOK_TYPES = [
   'Comics',
   'Travel',
   'Religious',
+  'Other'
 ] as const;
 
 export type BookType = (typeof BOOK_TYPES)[number];

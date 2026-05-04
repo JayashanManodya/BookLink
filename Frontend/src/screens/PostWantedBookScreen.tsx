@@ -172,19 +172,10 @@ export function PostWantedBookScreen({ navigation, route }: Props) {
       );
       return;
     }
-    const previewCombined = `${photoUri || ''}${existingPhotoUrl || ''}`.trim();
-    if (!previewCombined) {
-      alertOk('Photo required', 'Add a photo of the book you are looking for.');
-      return;
-    }
     const desc = description.trim();
     setBusy(true);
     try {
       const wantedBookPhoto = await uploadPhotoIfNeeded();
-      if (!wantedBookPhoto.trim()) {
-        alertOk('Photo required', 'Add a photo of the book you are looking for.');
-        return;
-      }
       const payload: Record<string, unknown> = {
         title: ti,
         author: au,
@@ -260,9 +251,7 @@ export function PostWantedBookScreen({ navigation, route }: Props) {
             ? 'Update the details of your wanted book.'
             : 'Tell the community what you need. Other readers may offer a swap.'}
         </Text>
-        <Text style={styles.label}>
-          Book photo <Text style={styles.reqMark}>*</Text>
-        </Text>
+        <Text style={styles.label}>Book photo (optional)</Text>
         <FormImageAttachment
           previewUri={photoUri || existingPhotoUrl}
           onPick={pickPhoto}
@@ -271,7 +260,7 @@ export function PostWantedBookScreen({ navigation, route }: Props) {
             setPhotoMime(null);
             setExistingPhotoUrl('');
           }}
-          emptyHint="Tap to add book photo (required)"
+          emptyHint="Tap to add book photo"
         />
         <Field label="Title" value={title} onChangeText={setTitle} placeholder="ICT Revision Guide 2024" />
         <Field label="Author (optional)" value={author} onChangeText={(v) => setAuthor(filterToLettersOnlyNameText(v))} />

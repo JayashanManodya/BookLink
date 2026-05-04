@@ -20,4 +20,5 @@ export const BOOK_TYPES = [
   'Comics',
   'Travel',
   'Religious',
+  'Other'
 ];
