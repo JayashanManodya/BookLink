@@ -10,6 +10,7 @@ import wishlistRoutes from './routes/wishlistRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import pointRoutes from './routes/pointRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
+import pushRoutes from './routes/pushRoutes.js';
 import exchangeReportRoutes from './routes/exchangeReportRoutes.js';
 
 const app = express();
@@ -44,6 +45,7 @@ app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/points', pointRoutes);
 app.use('/api/chats', chatRoutes);
+app.use('/api/push', pushRoutes);
 app.use('/api/reports', exchangeReportRoutes);
 
 app.use((err, req, res, next) => {

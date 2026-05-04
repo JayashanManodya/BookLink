@@ -21,6 +21,15 @@
           "cameraPermission": "Allow BookLink to take a photo for your book cover."
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#716EFF",
+          "defaultChannel": "messages",
+          "enableBackgroundRemoteNotifications": false
+        }
+      ],
       "expo-font",
       "@react-native-community/datetimepicker"
     ],
@@ -37,7 +46,9 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.VIBRATE"
       ]
     },
     "web": {
@@ -46,7 +57,7 @@
     "owner": "jayashan",
     "extra": {
       "eas": {
-        "projectId": "2918a818-0280-4ff3-ab82-d8c2e055aaff"
+        "projectId": "aa225e72-39e3-488c-a82f-1d1d640974d8"
       }
     }
   }

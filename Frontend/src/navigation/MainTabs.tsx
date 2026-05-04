@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { setAuthTokenProvider } from '../lib/api';
 import { ClerkUserSync } from '../components/ClerkUserSync';
+import { PushNotificationsSetup } from './PushNotificationsSetup';
 import { BrowseStack } from './BrowseStack';
 import { ProfileStack } from './ProfileStack';
 import { RequestsStack } from './RequestsStack';
@@ -41,6 +42,7 @@ function AuthApiSetup({ children }: { children: ReactNode }) {
   return (
     <>
       <ClerkUserSync />
+      <PushNotificationsSetup />
       {children}
     </>
   );

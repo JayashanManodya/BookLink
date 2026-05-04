@@ -16,6 +16,7 @@ import {
   titleBeginsWithDigit,
   isLettersOnlyNameText,
 } from '../utils/bookFormValidation.js';
+import { notifyWishlistChatRecipient } from '../services/chatMobilePush.js';
 
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -644,6 +645,18 @@ export async function createWishlistThreadMessage(req, res, next) {
       text,
       imageUrl,
     });
+    const recipientClerkUserId =
+      chk.row.seekerClerkUserId === req.clerkUserId ? chk.row.helperClerkUserId : chk.row.seekerClerkUserId;
+    if (recipientClerkUserId && recipientClerkUserId !== req.clerkUserId) {
+      void notifyWishlistChatRecipient({
+        recipientClerkUserId,
+        senderDisplayName,
+        text,
+        imageUrl,
+        threadId,
+        wishlistItemId: chk.row.wishlistItemId,
+      }).catch((err) => console.error('[push] wishlist chat', err));
+    }
     const userProfiles = await getPublicProfilesById([req.clerkUserId]);
     return res.status(201).json({ message: serializeThreadMessage(msg, userProfiles) });
   } catch (err) {

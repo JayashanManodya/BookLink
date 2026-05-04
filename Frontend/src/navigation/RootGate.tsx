@@ -5,6 +5,7 @@ import { useAuth } from '@clerk/clerk-expo';
 import { useEffect, useRef } from 'react';
 import { LandingScreen } from '../screens/LandingScreen';
 import { MainTabs } from './MainTabs';
+import { navigationRef } from './navigationRef';
 import { themePrimary, themePageBg } from '../theme/courseTheme';
 
 const navTheme = {
@@ -42,7 +43,7 @@ export function RootGate() {
     <>
       <StatusBar style={isSignedIn ? 'dark' : 'light'} />
       {isSignedIn ? (
-        <NavigationContainer theme={navTheme}>
+        <NavigationContainer ref={navigationRef} theme={navTheme}>
           <MainTabs />
         </NavigationContainer>
       ) : (

@@ -11,6 +11,7 @@ import {
   normalizeMeetupContactNumber,
   parseMeetupAtRequiredFuture,
 } from '../utils/meetupValidation.js';
+import { notifyExchangeChatRecipient } from '../services/chatMobilePush.js';
 
 async function shortDisplayName(clerkUserId) {
   try {
@@ -520,6 +521,18 @@ export async function createExchangeMessage(req, res, next) {
       text,
       imageUrl,
     });
+    const recipientClerkUserId =
+      chk.row.ownerClerkUserId === req.clerkUserId ? chk.row.requesterClerkUserId : chk.row.ownerClerkUserId;
+    if (recipientClerkUserId && recipientClerkUserId !== req.clerkUserId) {
+      void notifyExchangeChatRecipient({
+        recipientClerkUserId,
+        senderDisplayName,
+        text,
+        imageUrl,
+        requestId: id,
+        bookId: chk.row.bookId,
+      }).catch((err) => console.error('[push] exchange chat', err));
+    }
     const userProfiles = await getPublicProfilesById([req.clerkUserId]);
     return res.status(201).json({ message: serializeMessage(msg, userProfiles) });
   } catch (err) {
