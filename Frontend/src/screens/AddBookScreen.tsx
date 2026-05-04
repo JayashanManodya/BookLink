@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -23,15 +23,112 @@ import { FormImageAttachment } from '../components/FormImageAttachment';
 import { SignInGateCard } from '../components/SignInGateCard';
 import { SignInWithGoogleButton } from '../components/SignInWithGoogleButton';
 import type { BrowseStackParamList } from '../navigation/browseStackTypes';
-import { cascadingWhite, dreamland, lead, textSecondary, warmHaze, themePageBg, themePrimary, themeSurfaceMuted } from '../theme/colors';
+import {
+  cascadingWhite,
+  dreamland,
+  lead,
+  textSecondary,
+  themeDanger,
+  warmHaze,
+  themePageBg,
+  themePrimary,
+  themeSurfaceMuted,
+} from '../theme/colors';
 import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { cardShadow } from '../theme/shadows';
+import {
+  MIN_PUBLICATION_YEAR,
+  publicationYearPastOptions,
+  trimmedTitleBeginsWithDigit,
+  isLettersOnlyNameText,
+  filterToLettersOnlyNameText,
+  maxPastPublicationYear,
+} from '../lib/bookFormText';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'AddBook'>;
 
 const CONDITIONS = ['new', 'good', 'poor'] as const;
 const MAX_TEXT = 120;
-const MIN_YEAR = 1900;
+
+type FieldErrorKey =
+  | 'cover'
+  | 'title'
+  | 'author'
+  | 'description'
+  | 'location'
+  | 'language'
+  | 'year';
+
+type FieldErrors = Partial<Record<FieldErrorKey, string>>;
+
+function computeFieldErrors(vals: {
+  hasCover: boolean;
+  title: string;
+  author: string;
+  description: string;
+  location: string;
+  language: string;
+  year: number | null;
+}): FieldErrors {
+  const e: FieldErrors = {};
+  if (!vals.hasCover) {
+    e.cover = 'Add a cover photo';
+  }
+  const t = vals.title.trim();
+  const a = vals.author.trim();
+  const d = vals.description.trim();
+  const loc = vals.location.trim();
+  const lang = vals.language.trim();
+  const pastMax = maxPastPublicationYear();
+
+  if (!t) {
+    e.title = 'Title is required';
+  } else if (t.length < 2) {
+    e.title = 'Title must be at least 2 characters';
+  } else if (t.length > MAX_TEXT) {
+    e.title = `Keep title within ${MAX_TEXT} characters`;
+  } else if (trimmedTitleBeginsWithDigit(vals.title)) {
+    e.title = "Title can't start with a number";
+  }
+
+  if (!a) {
+    e.author = 'Author is required';
+  } else if (a.length < 2) {
+    e.author = 'Author must be at least 2 characters';
+  } else if (a.length > MAX_TEXT) {
+    e.author = `Keep author within ${MAX_TEXT} characters`;
+  } else if (!isLettersOnlyNameText(a)) {
+    e.author = 'Use letters only (no numbers)';
+  }
+
+  if (d.length > 2000) {
+    e.description = 'Description must be 2000 characters or fewer';
+  }
+
+  if (!loc) {
+    e.location = 'Choose a Divisional Secretariat';
+  } else if (!SRI_LANKA_DIVISIONS.includes(loc)) {
+    e.location = 'Pick a location from the list';
+  } else if (loc.length > 120) {
+    e.location = 'Location is too long';
+  }
+
+  if (lang.length === 1) {
+    e.language = 'Use at least 2 characters or leave language blank';
+  } else if (lang.length > 40) {
+    e.language = 'Language must be 40 characters or fewer';
+  } else if (!isLettersOnlyNameText(lang)) {
+    e.language = 'Use letters only (no numbers)';
+  }
+
+  if (vals.year != null) {
+    if (!Number.isFinite(vals.year) || vals.year < MIN_PUBLICATION_YEAR || vals.year > pastMax) {
+      e.year = pastMax < MIN_PUBLICATION_YEAR ? `Year must be ${MIN_PUBLICATION_YEAR} or earlier` : `Year must be ${MIN_PUBLICATION_YEAR}–${pastMax}`;
+    }
+  }
+
+  return e;
+}
 
 export function AddBookScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
@@ -51,15 +148,10 @@ export function AddBookScreen({ navigation }: Props) {
   const [yearModal, setYearModal] = useState(false);
   const [locationModal, setLocationModal] = useState(false);
   const [locationSearch, setLocationSearch] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const scrollRef = useRef<ScrollView>(null);
 
-  const yearOptions = useMemo(() => {
-    const y = new Date().getFullYear();
-    const list: (number | null)[] = [null];
-    for (let i = 0; i <= y - MIN_YEAR; i += 1) {
-      list.push(y - i);
-    }
-    return list;
-  }, []);
+  const yearOptions = useMemo(() => publicationYearPastOptions(MIN_PUBLICATION_YEAR), []);
   const filteredLocations = useMemo(() => {
     const q = locationSearch.trim().toLowerCase();
     if (!q) return SRI_LANKA_DIVISIONS;
@@ -81,6 +173,11 @@ export function AddBookScreen({ navigation }: Props) {
     if (!res.canceled && res.assets[0]) {
       setCoverUri(res.assets[0].uri);
       setCoverMime(res.assets[0].mimeType ?? 'image/jpeg');
+      setFieldErrors((prev) => {
+        if (!prev.cover) return prev;
+        const { cover: _omit, ...rest } = prev;
+        return rest;
+      });
     }
   };
 
@@ -113,43 +210,26 @@ export function AddBookScreen({ navigation }: Props) {
     const d = description.trim();
     const loc = location.trim();
     const l = language.trim();
-    const nowYear = new Date().getFullYear();
 
-    if (!t || !a) {
-      alertOk('Missing fields', 'Title and author are required.');
+    const nextErrors = computeFieldErrors({
+      hasCover: Boolean(coverUri?.trim()),
+      title,
+      author,
+      description,
+      location,
+      language,
+      year,
+    });
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors);
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
       return;
     }
-    if (t.length < 2 || a.length < 2) {
-      alertOk('Too short', 'Title and author must be at least 2 characters.');
-      return;
-    }
-    if (t.length > MAX_TEXT || a.length > MAX_TEXT) {
-      alertOk('Too long', `Title and author must be ${MAX_TEXT} characters or fewer.`);
-      return;
-    }
-    if (l && l.length > 40) {
-      alertOk('Invalid details', 'Language text is too long.');
-      return;
-    }
-    if (d.length > 2000) {
-      alertOk('Too long', 'Description must be 2000 characters or fewer.');
-      return;
-    }
-    if (loc.length > 120) {
-      alertOk('Too long', 'Location must be 120 characters or fewer.');
-      return;
-    }
-    if (year != null && (!Number.isFinite(year) || year < MIN_YEAR || year > nowYear + 1)) {
-      alertOk('Invalid year', `Pick a year between ${MIN_YEAR} and ${nowYear + 1}.`);
-      return;
-    }
+    setFieldErrors({});
 
     setBusy(true);
     try {
-      let coverImageUrl = '';
-      if (coverUri) {
-        coverImageUrl = await uploadCoverIfNeeded();
-      }
+      const coverImageUrl = await uploadCoverIfNeeded();
       await api.post('/api/books', {
         title: t,
         author: a,
@@ -172,6 +252,7 @@ export function AddBookScreen({ navigation }: Props) {
         setCondition('good');
         setCoverUri(null);
         setCoverMime(null);
+        setFieldErrors({});
         navigation.navigate('BrowseList');
       });
     } catch (e: unknown) {
@@ -203,35 +284,82 @@ export function AddBookScreen({ navigation }: Props) {
         </ScrollView>
       ) : (
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[styles.scroll, { paddingBottom: 40, gap: FORM_SCROLL_GAP }]}
           keyboardShouldPersistTaps="handled"
         >
-          <FormImageAttachment
-            previewUri={coverUri}
-            onPick={pickCover}
-            onRemove={() => {
-              setCoverUri(null);
-              setCoverMime(null);
+          <Text style={styles.label}>
+            Cover photo <Text style={styles.reqMark}>*</Text>
+          </Text>
+          <View style={fieldErrors.cover ? styles.coverErrorOutline : undefined}>
+            <FormImageAttachment
+              previewUri={coverUri}
+              onPick={pickCover}
+              onRemove={() => {
+                setCoverUri(null);
+                setCoverMime(null);
+              }}
+              emptyHint="Tap to add cover photo (required)"
+            />
+          </View>
+          {fieldErrors.cover ? <Text style={styles.fieldErrorTxt}>{fieldErrors.cover}</Text> : null}
+          <Field
+            label="Book title"
+            required
+            value={title}
+            onChangeText={(v) => {
+              setTitle(v);
+              setFieldErrors((prev) => {
+                if (!prev.title) return prev;
+                const { title: _omit, ...rest } = prev;
+                return rest;
+              });
             }}
-            emptyHint="Tap to add cover photo"
+            error={fieldErrors.title}
           />
-          <Field label="Book title" value={title} onChangeText={setTitle} />
-          <Field label="Author" value={author} onChangeText={setAuthor} />
+          <Field
+            label="Author"
+            required
+            value={author}
+            onChangeText={(v) => {
+              setAuthor(filterToLettersOnlyNameText(v));
+              setFieldErrors((prev) => {
+                if (!prev.author) return prev;
+                const { author: _omit, ...rest } = prev;
+                return rest;
+              });
+            }}
+            error={fieldErrors.author}
+          />
           <Field
             label="Description"
             value={description}
-            onChangeText={setDescription}
+            onChangeText={(v) => {
+              setDescription(v);
+              setFieldErrors((prev) => {
+                if (!prev.description) return prev;
+                const { description: _omit, ...rest } = prev;
+                return rest;
+              });
+            }}
             placeholder="Tell readers about this book..."
             multiline
             numberOfLines={4}
+            error={fieldErrors.description}
           />
-          <Text style={styles.label}>Divisional Secretariat (DS) location</Text>
-          <Pressable style={styles.selectRow} onPress={() => setLocationModal(true)}>
+          <Text style={styles.label}>
+            Divisional Secretariat (DS) location <Text style={styles.reqMark}>*</Text>
+          </Text>
+          <Pressable
+            style={[styles.selectRow, fieldErrors.location && styles.fieldErrorOutline]}
+            onPress={() => setLocationModal(true)}
+          >
             <Text style={[styles.selectVal, !location && styles.selectPlaceholder]}>
               {location || 'Select Divisional Secretariat'}
             </Text>
             <Ionicons name="chevron-down" size={20} color={lead} />
           </Pressable>
+          {fieldErrors.location ? <Text style={styles.fieldErrorTxt}>{fieldErrors.location}</Text> : null}
 
           <Text style={styles.label}>Book type</Text>
           <Pressable style={styles.selectRow} onPress={() => setTypeModal(true)}>
@@ -239,11 +367,15 @@ export function AddBookScreen({ navigation }: Props) {
             <Ionicons name="chevron-down" size={20} color={lead} />
           </Pressable>
 
-          <Text style={styles.label}>Publication year (optional)</Text>
-          <Pressable style={styles.selectRow} onPress={() => setYearModal(true)}>
+          <Text style={styles.label}>Book year (optional)</Text>
+          <Pressable
+            style={[styles.selectRow, fieldErrors.year && styles.fieldErrorOutline]}
+            onPress={() => setYearModal(true)}
+          >
             <Text style={styles.selectVal}>{year == null ? 'Not specified' : String(year)}</Text>
             <Ionicons name="chevron-down" size={20} color={lead} />
           </Pressable>
+          {fieldErrors.year ? <Text style={styles.fieldErrorTxt}>{fieldErrors.year}</Text> : null}
 
           <View style={styles.row2}>
             <View style={{ flex: 1 }}>
@@ -261,7 +393,20 @@ export function AddBookScreen({ navigation }: Props) {
               </View>
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Field label="Language" value={language} onChangeText={setLanguage} placeholder="Sinhala / Tamil / English" />
+              <Field
+                label="Language"
+                value={language}
+                onChangeText={(v) => {
+                  setLanguage(filterToLettersOnlyNameText(v));
+                  setFieldErrors((prev) => {
+                    if (!prev.language) return prev;
+                    const { language: _omit, ...rest } = prev;
+                    return rest;
+                  });
+                }}
+                placeholder="Sinhala / Tamil / English"
+                error={fieldErrors.language}
+              />
             </View>
           </View>
 
@@ -302,7 +447,7 @@ export function AddBookScreen({ navigation }: Props) {
         <View style={styles.modalRoot}>
           <Pressable style={styles.modalBackdrop} onPress={() => setYearModal(false)} />
           <View style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-            <Text style={styles.modalTitle}>Publication year</Text>
+            <Text style={styles.modalTitle}>Book year</Text>
             <ScrollView style={{ maxHeight: 400 }} keyboardShouldPersistTaps="handled">
               {yearOptions.map((yOpt) => (
                 <Pressable
@@ -311,6 +456,11 @@ export function AddBookScreen({ navigation }: Props) {
                   onPress={() => {
                     setYear(yOpt);
                     setYearModal(false);
+                    setFieldErrors((prev) => {
+                      if (!prev.year) return prev;
+                      const { year: _omit, ...rest } = prev;
+                      return rest;
+                    });
                   }}
                 >
                   <Text style={styles.modalRowTxt}>{yOpt == null ? 'Not specified' : String(yOpt)}</Text>
@@ -342,6 +492,11 @@ export function AddBookScreen({ navigation }: Props) {
                     setLocation(locOption);
                     setLocationModal(false);
                     setLocationSearch('');
+                    setFieldErrors((prev) => {
+                      if (!prev.location) return prev;
+                      const { location: _omit, ...rest } = prev;
+                      return rest;
+                    });
                   }}
                 >
                   <Text style={styles.modalRowTxt}>{locOption}</Text>
@@ -358,22 +513,29 @@ export function AddBookScreen({ navigation }: Props) {
 
 function Field({
   label,
+  required,
   value,
   onChangeText,
   placeholder,
   multiline,
   numberOfLines,
+  error,
 }: {
   label: string;
+  required?: boolean;
   value: string;
   onChangeText: (t: string) => void;
   placeholder?: string;
   multiline?: boolean;
   numberOfLines?: number;
+  error?: string;
 }) {
   return (
     <View style={{ width: '100%', gap: 6 }}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>
+        {label}
+        {required ? <Text style={styles.reqMark}> *</Text> : null}
+      </Text>
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -382,8 +544,9 @@ function Field({
         multiline={multiline}
         numberOfLines={numberOfLines}
         textAlignVertical={multiline ? 'top' : 'center'}
-        style={[styles.input, multiline && styles.inputMultiline]}
+        style={[styles.input, multiline && styles.inputMultiline, error && styles.inputError]}
       />
+      {error ? <Text style={styles.fieldErrorTxt}>{error}</Text> : null}
     </View>
   );
 }
@@ -403,6 +566,18 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 20, paddingTop: 8 },
   gateScroll: { flexGrow: 1, paddingBottom: 32 },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
+  reqMark: { color: themeDanger, fontWeight: '800' },
+  fieldErrorTxt: { fontSize: 12, color: themeDanger, fontWeight: '600', marginTop: 2 },
+  fieldErrorOutline: {
+    borderColor: themeDanger,
+    borderWidth: 2,
+  },
+  coverErrorOutline: {
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: themeDanger,
+    overflow: 'hidden',
+  },
   hint: { fontSize: 13, color: textSecondary, lineHeight: 18, marginTop: 4 },
   input: {
     backgroundColor: themeSurfaceMuted,
@@ -415,6 +590,10 @@ const styles = StyleSheet.create({
     color: lead,
   },
   inputMultiline: { minHeight: 96, paddingTop: 12, marginBottom: 2 },
+  inputError: {
+    borderColor: themeDanger,
+    borderWidth: 2,
+  },
   selectRow: {
     flexDirection: 'row',
     alignItems: 'center',

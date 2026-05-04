@@ -5,13 +5,15 @@ export const landingPurple = '#716EFF';
 /** Soft blob overlay on `landingPurple` */
 export const landingPurpleBlob = 'rgba(45, 32, 120, 0.28)';
 
-export const cascadingWhite = '#fdfcf9';
+export const cascadingWhite = '#ffffff';
 export const chineseSilver = '#e6e6ea';
 export const crunch = '#e8d9b5';
-export const dreamland = '#e0ddd4';
-export const lead = '#1c1b1a';
-export const textSecondary = '#5c5a57';
-export const warmHaze = '#8a857c';
+/** Subtle divider / input rim — tinted with primary violet */
+export const dreamland = 'rgba(113, 110, 255, 0.16)';
+/** Style guide ink */
+export const lead = '#101011';
+export const textSecondary = '#5c5c6c';
+export const warmHaze = '#71717a';
 /** Inactive tab icons on the dark (lead) pill — must contrast with `lead` */
 export const iconOnLead = '#a8a39c';
 

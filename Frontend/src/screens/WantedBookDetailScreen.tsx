@@ -197,6 +197,12 @@ export function WantedBookDetailScreen({ navigation, route }: Props) {
           <Text style={styles.label}>Posted by</Text>
           <Text style={styles.value}>{item.ownerDisplayName || 'Reader'}</Text>
         </View>
+        {item.year != null && Number.isFinite(item.year) ? (
+          <View style={styles.row}>
+            <Text style={styles.label}>Publication year</Text>
+            <Text style={styles.value}>{String(item.year)}</Text>
+          </View>
+        ) : null}
         <View style={styles.row}>
           <Text style={styles.label}>Urgency</Text>
           <Text style={[styles.badge, { backgroundColor: urgency.bg, color: urgency.color }]}>{item.urgency}</Text>

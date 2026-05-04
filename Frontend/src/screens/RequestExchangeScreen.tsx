@@ -5,32 +5,58 @@ import { useAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, apiErrorMessage } from '../lib/api';
+import { alertOk } from '../lib/platformAlert';
 import { SignInGateCard } from '../components/SignInGateCard';
 import { SignInWithGoogleButton } from '../components/SignInWithGoogleButton';
 import type { BrowseStackParamList } from '../navigation/browseStackTypes';
-import { cascadingWhite, dreamland, lead, textSecondary, warmHaze, themePageBg, themePrimary, themeSurfaceMuted } from '../theme/colors';
+import { dreamland, lead, textSecondary, warmHaze, themePageBg, themePrimary, themeSurfaceMuted } from '../theme/colors';
 import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { cardShadow } from '../theme/shadows';
 
 type Props = NativeStackScreenProps<BrowseStackParamList, 'RequestExchange'>;
 
+/** Match backend `normalizeBookIdInput`: params from navigation / deep links may be `{ $oid }` blobs. */
+function normalizeBookIdParam(raw: unknown): string {
+  if (raw == null) return '';
+  if (typeof raw === 'string') return raw.trim();
+  if (typeof raw === 'object' && raw !== null && '$oid' in raw && typeof (raw as { $oid: string }).$oid === 'string') {
+    return (raw as { $oid: string }).$oid.trim();
+  }
+  return String(raw).trim();
+}
+
+const MONGO_ID_RE = /^[a-f\d]{24}$/i;
+
 export function RequestExchangeScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { isSignedIn } = useAuth();
-  const { bookId, title } = route.params;
+  const { bookId: bookIdRaw, title } = route.params;
+  const bookId = normalizeBookIdParam(bookIdRaw);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
+    if (!MONGO_ID_RE.test(bookId)) {
+      Alert.alert('Error', 'This listing reference is invalid. Go back and open the book again.');
+      return;
+    }
     setBusy(true);
     try {
       await api.post('/api/requests', {
         bookId,
         message: message.trim(),
       });
-      Alert.alert('Sent', 'The owner will see your offer in Requests.', [
-        { text: 'OK', onPress: () => navigation.popToTop() },
-      ]);
+      alertOk(
+        'Request sent successfully',
+        'Your exchange offer was delivered. We are taking you to the Exchange tab — check Sent to see your request.',
+        () => {
+          navigation.popToTop();
+          navigation.getParent()?.navigate('Requests', {
+            screen: 'RequestsHome',
+            params: { preferSentTab: true },
+          });
+        }
+      );
     } catch (e: unknown) {
       const msg = apiErrorMessage(e, 'Could not send request');
       Alert.alert('Error', msg);

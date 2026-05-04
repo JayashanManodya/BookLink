@@ -7,6 +7,10 @@ import { ExchangeMessage } from '../models/ExchangeMessage.js';
 import { Review } from '../models/Review.js';
 import { ExchangeReport } from '../models/ExchangeReport.js';
 import { normalizeChatImageUrl } from '../utils/chatImageUrl.js';
+import {
+  normalizeMeetupContactNumber,
+  parseMeetupAtRequiredFuture,
+} from '../utils/meetupValidation.js';
 
 async function shortDisplayName(clerkUserId) {
   try {
@@ -17,6 +21,14 @@ async function shortDisplayName(clerkUserId) {
   } catch {
     return 'Reader';
   }
+}
+
+/** Coerce request body bookId (plain string or extended JSON `$oid`) to a trimmed string. */
+function normalizeBookIdInput(raw) {
+  if (raw == null) return '';
+  if (typeof raw === 'string') return raw.trim();
+  if (typeof raw === 'object' && typeof raw.$oid === 'string') return raw.$oid.trim();
+  return '';
 }
 
 async function getPublicProfilesById(userIds) {
@@ -204,7 +216,9 @@ export async function listExchangeRequests(req, res, next) {
 
 export async function createExchangeRequest(req, res, next) {
   try {
-    const { bookId, message, offeredBookPhoto } = req.body ?? {};
+    const body = req.body ?? {};
+    const bookId = normalizeBookIdInput(body.bookId);
+    const { message, offeredBookPhoto } = body;
     if (!bookId || !mongoose.isValidObjectId(bookId)) {
       return res.status(400).json({ error: 'valid bookId is required' });
     }
@@ -222,15 +236,28 @@ export async function createExchangeRequest(req, res, next) {
     if (existingAccepted) {
       return res.status(400).json({ error: 'This listing already has an accepted swap with another reader' });
     }
-    const dupPending = await ExchangeRequest.findOne({
+    const dupPendingRow = await ExchangeRequest.findOne({
       bookId,
       requesterClerkUserId: req.clerkUserId,
       status: 'pending',
-    }).lean();
-    if (dupPending) {
-      return res.status(400).json({ error: 'You already have a pending request for this book' });
-    }
+    });
     const requesterDisplayName = await shortDisplayName(req.clerkUserId);
+
+    if (dupPendingRow) {
+      if (typeof message === 'string') {
+        dupPendingRow.message = message.slice(0, 2000);
+      }
+      if (typeof offeredBookPhoto === 'string') {
+        dupPendingRow.offeredBookPhoto = offeredBookPhoto.trim().slice(0, 2000);
+      }
+      dupPendingRow.requesterDisplayName = requesterDisplayName;
+      await dupPendingRow.save();
+      const full = await ExchangeRequest.findById(dupPendingRow._id).lean();
+      const userProfiles = await getPublicProfilesById([full.requesterClerkUserId, full.ownerClerkUserId]);
+      /** 200 — idempotent retries / double-send after a partial success avoid “no success flow”. */
+      return res.status(200).json({ request: serializeRequest(full, book, userProfiles) });
+    }
+
     const doc = await ExchangeRequest.create({
       bookId,
       requesterClerkUserId: req.clerkUserId,
@@ -362,24 +389,6 @@ export async function updateExchangeRequestStatus(req, res, next) {
   }
 }
 
-function parseMeetupAt(raw) {
-  if (raw == null) return { ok: false, error: 'meetupAt is required (ISO date-time)' };
-  const d = new Date(typeof raw === 'string' ? raw.trim() : raw);
-  if (Number.isNaN(d.getTime())) {
-    return { ok: false, error: 'meetupAt must be a valid date and time' };
-  }
-  return { ok: true, date: d };
-}
-
-function normalizeMeetupContact(raw) {
-  if (typeof raw !== 'string') return { ok: false, error: 'meetupContactNumber is required' };
-  const t = raw.trim().replace(/\s+/g, ' ');
-  if (t.length < 5 || t.length > 40) {
-    return { ok: false, error: 'meetupContactNumber must be 5–40 characters' };
-  }
-  return { ok: true, value: t };
-}
-
 export async function setExchangeRequestMeetup(req, res, next) {
   try {
     const { id } = req.params;
@@ -390,11 +399,11 @@ export async function setExchangeRequestMeetup(req, res, next) {
     if (!collectionPointId || !mongoose.isValidObjectId(String(collectionPointId))) {
       return res.status(400).json({ error: 'valid collectionPointId is required' });
     }
-    const when = parseMeetupAt(meetupAt);
+    const when = parseMeetupAtRequiredFuture(meetupAt);
     if (!when.ok) {
       return res.status(400).json({ error: when.error });
     }
-    const phone = normalizeMeetupContact(meetupContactNumber);
+    const phone = normalizeMeetupContactNumber(meetupContactNumber);
     if (!phone.ok) {
       return res.status(400).json({ error: phone.error });
     }

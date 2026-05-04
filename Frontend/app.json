@@ -21,7 +21,8 @@
           "cameraPermission": "Allow BookLink to take a photo for your book cover."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "@react-native-community/datetimepicker"
     ],
     "ios": {
       "bundleIdentifier": "lk.booklink.app",
@@ -42,11 +43,11 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "owner": "jayashan",
     "extra": {
       "eas": {
-        "projectId": "3e8bb706-2e08-468e-8e00-655c4e481835"
+        "projectId": "2918a818-0280-4ff3-ab82-d8c2e055aaff"
       }
-    },
-    "owner": "jayashan"
+    }
   }
 }

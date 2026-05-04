@@ -1,5 +1,11 @@
 import mongoose from 'mongoose';
 import { COLLECTION_POINT_CITIES } from '../constants/collectionPointCities.js';
+import {
+  normalizeCollectionPointContact,
+  validatePointAddressTrimmed,
+  validatePointContactDigits,
+  validatePointNameTrimmed,
+} from '../utils/collectionPointValidation.js';
 import { CollectionPoint } from '../models/CollectionPoint.js';
 
 function escapeRegex(s) {
@@ -20,27 +26,36 @@ function parseLatLng(body) {
 
 export async function submitPoint(req, res, next) {
   try {
-    const { name, city, address, association, locationPhoto, operatingHours, contactNumber } = req.body ?? {};
+    const { name, city, address, locationPhoto, contactNumber } = req.body ?? {};
     if (!name || typeof name !== 'string' || !city || typeof city !== 'string' || !address || typeof address !== 'string') {
       return res.status(400).json({ error: 'name, city, and address are required' });
     }
+    const nameTrim = name.trim();
+    const nameErr = validatePointNameTrimmed(nameTrim);
+    if (nameErr) return res.status(400).json({ error: nameErr });
     const cityTrim = city.trim();
     if (!COLLECTION_POINT_CITIES.includes(cityTrim)) {
       return res.status(400).json({ error: 'city must be chosen from the supported city list' });
     }
+    const addrTrim = address.trim();
+    const addrErr = validatePointAddressTrimmed(addrTrim);
+    if (addrErr) return res.status(400).json({ error: addrErr });
+    const contactDigits = normalizeCollectionPointContact(contactNumber);
+    const contactErr = validatePointContactDigits(contactDigits);
+    if (contactErr) return res.status(400).json({ error: contactErr });
     const coords = parseLatLng(req.body);
     if (!coords.ok) {
       return res.status(400).json({ error: coords.error });
     }
     const point = await CollectionPoint.create({
-      name: name.trim(),
+      name: nameTrim.slice(0, 200),
       city: cityTrim,
-      address: address.trim(),
-      association: typeof association === 'string' ? association.trim() : '',
+      address: addrTrim.slice(0, 500),
+      association: '',
       locationPhoto: typeof locationPhoto === 'string' ? locationPhoto.trim() : '',
       addedByClerkUserId: req.clerkUserId,
-      operatingHours: typeof operatingHours === 'string' ? operatingHours.trim() : '',
-      contactNumber: typeof contactNumber === 'string' ? contactNumber.trim() : '',
+      operatingHours: '',
+      contactNumber: contactDigits,
       latitude: coords.latitude,
       longitude: coords.longitude,
     });
@@ -97,25 +112,33 @@ export async function updatePoint(req, res, next) {
       name,
       city,
       address,
-      association,
-      operatingHours,
       contactNumber,
       locationPhoto,
       latitude,
       longitude,
     } = req.body ?? {};
-    if (typeof name === 'string') point.name = name.trim().slice(0, 200);
-    if (typeof city === 'string') {
-      const cityTrim = city.trim();
-      if (!COLLECTION_POINT_CITIES.includes(cityTrim)) {
-        return res.status(400).json({ error: 'city must be chosen from the supported city list' });
-      }
-      point.city = cityTrim;
+    if (typeof name !== 'string' || typeof city !== 'string' || typeof address !== 'string' || typeof contactNumber !== 'string') {
+      return res.status(400).json({ error: 'name, city, address, and contact number are required' });
     }
-    if (typeof address === 'string') point.address = address.trim().slice(0, 500);
-    if (typeof association === 'string') point.association = association.trim().slice(0, 200);
-    if (typeof operatingHours === 'string') point.operatingHours = operatingHours.trim().slice(0, 300);
-    if (typeof contactNumber === 'string') point.contactNumber = contactNumber.trim().slice(0, 40);
+    point.association = '';
+    point.operatingHours = '';
+    const nameTrim = name.trim();
+    const nameErr = validatePointNameTrimmed(nameTrim);
+    if (nameErr) return res.status(400).json({ error: nameErr });
+    point.name = nameTrim.slice(0, 200);
+    const cityTrim = city.trim();
+    if (!COLLECTION_POINT_CITIES.includes(cityTrim)) {
+      return res.status(400).json({ error: 'city must be chosen from the supported city list' });
+    }
+    point.city = cityTrim;
+    const addrTrim = address.trim();
+    const addrErr = validatePointAddressTrimmed(addrTrim);
+    if (addrErr) return res.status(400).json({ error: addrErr });
+    point.address = addrTrim.slice(0, 500);
+    const contactDigits = normalizeCollectionPointContact(contactNumber);
+    const contactErr = validatePointContactDigits(contactDigits);
+    if (contactErr) return res.status(400).json({ error: contactErr });
+    point.contactNumber = contactDigits;
     if (typeof locationPhoto === 'string') point.locationPhoto = locationPhoto.trim();
     if (latitude !== undefined || longitude !== undefined) {
       const coords = parseLatLng({ latitude, longitude });

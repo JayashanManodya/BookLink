@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -20,8 +20,6 @@ import type { RequestsStackParamList } from '../navigation/requestsStackTypes';
 import {
   themeCard,
   themeInboxSearchBorder,
-  themeInboxTabActiveBg,
-  themeInboxTabInactiveBg,
   themeInboxTopBorder,
   themeMuted,
   themePageBg,
@@ -31,11 +29,9 @@ import {
 import { textSecondary } from '../theme/colors';
 import { font } from '../theme/typography';
 
-type ExchangeInboxTab = 'sent' | 'received';
-
 type InboxChatExchange = {
   kind: 'exchange';
-  /** Present when `kind` is `exchange`; omitted on older API responses (treated as received). */
+  /** You listed the book (`received`) vs you requested someone else's (`sent`). */
   exchangeRole?: 'sent' | 'received';
   requestId: string;
   bookTitle: string;
@@ -62,13 +58,6 @@ type InboxChat = InboxChatExchange | InboxChatWishlist;
 
 type Props = NativeStackScreenProps<RequestsStackParamList, 'ChatsInbox'>;
 
-function truncateHint(s: string, max: number) {
-  const t = s.trim();
-  if (!t) return '';
-  if (t.length <= max) return t;
-  return `${t.slice(0, Math.max(0, max - 1))}…`;
-}
-
 function sortChatsDescending(a: InboxChat, b: InboxChat) {
   return new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime();
 }
@@ -77,14 +66,9 @@ export function ChatsInboxScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { isSignedIn, userId } = useAuth();
   const [chats, setChats] = useState<InboxChat[]>([]);
-  const [exchangeTab, setExchangeTab] = useState<ExchangeInboxTab>('received');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-
-  useEffect(() => {
-    setSearch('');
-  }, [exchangeTab]);
 
   const load = useCallback(async () => {
     if (!isSignedIn) return;
@@ -114,22 +98,13 @@ export function ChatsInboxScreen({ navigation }: Props) {
     [chats]
   );
 
-  const exchangeForTab = useMemo(
-    () =>
-      sortedExchange.filter((c) => {
-        const role = c.exchangeRole ?? 'received';
-        return exchangeTab === 'sent' ? role === 'sent' : role === 'received';
-      }),
-    [sortedExchange, exchangeTab]
-  );
-
   const filteredExchange = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return exchangeForTab;
-    return exchangeForTab.filter((c) =>
+    if (!q) return sortedExchange;
+    return sortedExchange.filter((c) =>
       `${c.peerName} ${c.preview} ${c.bookTitle}`.toLowerCase().includes(q)
     );
-  }, [exchangeForTab, search]);
+  }, [sortedExchange, search]);
 
   const openExchangeChat = useCallback(
     (c: InboxChatExchange) => {
@@ -165,7 +140,7 @@ export function ChatsInboxScreen({ navigation }: Props) {
         <Ionicons name="chevron-back" size={26} color={themeInk} />
       </Pressable>
       <Text style={[styles.screenTitle, { fontFamily: font.bold }]} numberOfLines={1}>
-        Exchange · inbox
+        Swap chats
       </Text>
       <Pressable
         style={styles.iconBtn}
@@ -212,47 +187,12 @@ export function ChatsInboxScreen({ navigation }: Props) {
     <View style={styles.screen}>
       {headerRow}
       <View style={[styles.body, { paddingBottom: insets.bottom + 24 }]}>
-        <View style={styles.tabsRow}>
-          <Pressable
-            onPress={() => setExchangeTab('received')}
-            style={[styles.tabChip, exchangeTab === 'received' && styles.tabChipActive]}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: exchangeTab === 'received' }}
-          >
-            <Text
-              style={[
-                styles.tabChipTxt,
-                { fontFamily: exchangeTab === 'received' ? font.semi : font.medium },
-                exchangeTab === 'received' && styles.tabChipTxtActive,
-              ]}
-            >
-              Received
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setExchangeTab('sent')}
-            style={[styles.tabChip, exchangeTab === 'sent' && styles.tabChipActive]}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: exchangeTab === 'sent' }}
-          >
-            <Text
-              style={[
-                styles.tabChipTxt,
-                { fontFamily: exchangeTab === 'sent' ? font.semi : font.medium },
-                exchangeTab === 'sent' && styles.tabChipTxtActive,
-              ]}
-            >
-              Sent
-            </Text>
-          </Pressable>
-        </View>
-
         <View style={styles.searchShell}>
           <Ionicons name="search-outline" size={20} color={themePrimary} style={{ opacity: 0.55 }} />
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Search by name or book..."
+            placeholder="Search by book title, name, or message…"
             placeholderTextColor={themeMuted}
             style={styles.searchInput}
             returnKeyType="search"
@@ -285,12 +225,11 @@ export function ChatsInboxScreen({ navigation }: Props) {
             showsVerticalScrollIndicator
             keyboardShouldPersistTaps="handled"
           >
-            {exchangeForTab.length === 0 ? (
+            {sortedExchange.length === 0 ? (
               <View style={styles.emptyWrap}>
                 <Text style={[styles.emptyBody, { fontFamily: font.regular }]}>
-                  {exchangeTab === 'sent'
-                    ? 'No threads yet for requests you sent. Browse listings and send an exchange offer to start a conversation.'
-                    : 'No chats from readers requesting your listings. When someone swaps on your books, conversations land here.'}
+                  No swap threads yet. When you send or receive an exchange request, chats for that book appear here
+                  together — each row uses the book title.
                 </Text>
               </View>
             ) : filteredExchange.length === 0 ? (
@@ -305,16 +244,15 @@ export function ChatsInboxScreen({ navigation }: Props) {
                 <ChatListRow
                   key={c.requestId}
                   variant="inbox"
-                  title={c.peerName}
+                  title={c.bookTitle || 'Book'}
                   preview={c.preview}
                   lastMessageSenderClerkUserId={c.lastMessageSenderClerkUserId}
                   peerNameForPrefix={c.peerName}
                   myUserId={userId}
                   dateIso={c.lastAt}
                   imageUrl={c.peerAvatarUrl}
-                  fallbackLetter={c.peerName || '?'}
+                  fallbackLetter={(c.bookTitle || '?').trim().slice(0, 1).toUpperCase() || '?'}
                   onPress={() => openExchangeChat(c)}
-                  contextHint={truncateHint(c.bookTitle, 40)}
                 />
               ))
             )}
@@ -356,31 +294,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 14,
-  },
-  tabsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 14,
-  },
-  tabChip: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    alignItems: 'center',
-    backgroundColor: themeInboxTabInactiveBg,
-  },
-  tabChipActive: {
-    backgroundColor: themeInboxTabActiveBg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: themePrimary,
-  },
-  tabChipTxt: {
-    fontSize: 14,
-    color: themeMuted,
-  },
-  tabChipTxtActive: {
-    color: themePrimary,
   },
   searchShell: {
     flexDirection: 'row',

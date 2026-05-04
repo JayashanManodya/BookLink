@@ -20,16 +20,23 @@ import { alertOk } from '../lib/platformAlert';
 import { BOOK_TYPES, type BookType } from '../constants/bookTypes';
 import { SRI_LANKA_DIVISIONS } from '../constants/sriLankaDivisions';
 import type { ProfileStackParamList } from '../navigation/profileStackTypes';
-import { cascadingWhite, dreamland, lead, textSecondary, warmHaze, themePageBg, themePrimary, themeSurfaceMuted } from '../theme/colors';
+import { cascadingWhite, dreamland, lead, textSecondary, themeDanger, warmHaze, themePageBg, themePrimary, themeSurfaceMuted } from '../theme/colors';
 import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { cardShadow } from '../theme/shadows';
 import type { Book } from '../types/book';
+import {
+  MIN_PUBLICATION_YEAR,
+  publicationYearPastOptions,
+  trimmedTitleBeginsWithDigit,
+  isLettersOnlyNameText,
+  filterToLettersOnlyNameText,
+  maxPastPublicationYear,
+} from '../lib/bookFormText';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'EditListing'>;
 
 const CONDITIONS = ['new', 'good', 'poor'] as const;
 const MAX_TEXT = 120;
-const MIN_YEAR = 1900;
 
 export function EditListingScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
@@ -53,12 +60,7 @@ export function EditListingScreen({ navigation, route }: Props) {
   const [locationModal, setLocationModal] = useState(false);
   const [locationSearch, setLocationSearch] = useState('');
 
-  const yearOptions = useMemo(() => {
-    const y = new Date().getFullYear();
-    const list: (number | null)[] = [null];
-    for (let i = 0; i <= y - MIN_YEAR; i += 1) list.push(y - i);
-    return list;
-  }, []);
+  const yearOptions = useMemo(() => publicationYearPastOptions(MIN_PUBLICATION_YEAR), []);
   const filteredLocations = useMemo(() => {
     const q = locationSearch.trim().toLowerCase();
     if (!q) return SRI_LANKA_DIVISIONS;
@@ -77,7 +79,11 @@ export function EditListingScreen({ navigation, route }: Props) {
         setLocation(b.location ?? '');
         setLanguage(b.language ?? '');
         setBookType(BOOK_TYPES.includes(b.bookType as BookType) ? (b.bookType as BookType) : BOOK_TYPES[0]);
-        setYear(typeof b.year === 'number' ? b.year : null);
+        const pastMax = maxPastPublicationYear();
+        const yNum = typeof b.year === 'number' && Number.isFinite(b.year) ? b.year : null;
+        setYear(
+          yNum !== null && yNum >= MIN_PUBLICATION_YEAR && yNum <= pastMax ? yNum : null
+        );
         setCondition(
           b.condition === 'fair' || b.condition === 'poor'
             ? 'poor'
@@ -143,18 +149,27 @@ export function EditListingScreen({ navigation, route }: Props) {
     const d = description.trim();
     const loc = location.trim();
     const l = language.trim();
-    const nowYear = new Date().getFullYear();
+    const nowPastMax = maxPastPublicationYear();
 
     if (!t || !a) return alertOk('Missing fields', 'Title and author are required.');
     if (t.length < 2 || a.length < 2) return alertOk('Too short', 'Title and author must be at least 2 characters.');
+    if (trimmedTitleBeginsWithDigit(t)) return alertOk('Invalid title', "Title can't start with a number.");
+    if (!isLettersOnlyNameText(a)) return alertOk('Invalid author', 'Use letters only (no numbers).');
+    if (l && !isLettersOnlyNameText(l)) return alertOk('Invalid details', 'Language must use letters only (no numbers).');
     if (t.length > MAX_TEXT || a.length > MAX_TEXT) {
       return alertOk('Too long', `Title and author must be ${MAX_TEXT} characters or fewer.`);
     }
     if (l && l.length > 40) return alertOk('Invalid details', 'Language text is too long.');
     if (d.length > 2000) return alertOk('Too long', 'Description must be 2000 characters or fewer.');
     if (loc.length > 120) return alertOk('Too long', 'Location must be 120 characters or fewer.');
-    if (year != null && (!Number.isFinite(year) || year < MIN_YEAR || year > nowYear + 1)) {
-      return alertOk('Invalid year', `Pick a year between ${MIN_YEAR} and ${nowYear + 1}.`);
+    if (year != null && (!Number.isFinite(year) || year < MIN_PUBLICATION_YEAR || year > nowPastMax)) {
+      return alertOk(
+        'Invalid year',
+        nowPastMax < MIN_PUBLICATION_YEAR ? `Pick a year from ${MIN_PUBLICATION_YEAR} onward.` : `Pick a year from ${MIN_PUBLICATION_YEAR} to ${nowPastMax}.`
+      );
+    }
+    if (!coverPreview.trim()) {
+      return alertOk('Cover required', 'Add a cover photo before saving your listing.');
     }
 
     setBusy(true);
@@ -202,6 +217,9 @@ export function EditListingScreen({ navigation, route }: Props) {
         contentContainerStyle={[styles.scroll, { gap: FORM_SCROLL_GAP }]}
         keyboardShouldPersistTaps="handled"
       >
+        <Text style={styles.label}>
+          Cover photo <Text style={styles.reqMark}>*</Text>
+        </Text>
         <FormImageAttachment
           previewUri={coverPreview}
           onPick={pickCover}
@@ -210,11 +228,11 @@ export function EditListingScreen({ navigation, route }: Props) {
             setCoverMime(null);
             setCoverPreview('');
           }}
-          emptyHint="Tap to add cover photo"
+          emptyHint="Tap to add cover photo (required)"
         />
 
         <Field label="Book title" value={title} onChangeText={setTitle} />
-        <Field label="Author" value={author} onChangeText={setAuthor} />
+        <Field label="Author" value={author} onChangeText={(v) => setAuthor(filterToLettersOnlyNameText(v))} />
         <Field
           label="Description"
           value={description}
@@ -255,7 +273,12 @@ export function EditListingScreen({ navigation, route }: Props) {
             </View>
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Field label="Language" value={language} onChangeText={setLanguage} placeholder="English / Sinhala / Tamil" />
+            <Field
+              label="Language"
+              value={language}
+              onChangeText={(v) => setLanguage(filterToLettersOnlyNameText(v))}
+              placeholder="English / Sinhala / Tamil"
+            />
           </View>
         </View>
 
@@ -392,6 +415,7 @@ const styles = StyleSheet.create({
   screenTitle: { fontSize: 18, fontWeight: '800', color: lead },
   scroll: { paddingHorizontal: 20, paddingBottom: 32, paddingTop: 8 },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
+  reqMark: { color: themeDanger, fontWeight: '800' },
   input: {
     backgroundColor: themeSurfaceMuted,
     borderRadius: 14,

@@ -1,18 +1,22 @@
 import mongoose from 'mongoose';
-import { clerkClient } from '@clerk/express';
 import { Review } from '../models/Review.js';
 import { ExchangeRequest } from '../models/ExchangeRequest.js';
 import { ExchangeReport } from '../models/ExchangeReport.js';
+import { listerFullDisplayNameFromClerk } from '../utils/listerDisplayName.js';
+
+const REVIEW_COMMENT_MIN_LENGTH = 10;
+const REVIEW_COMMENT_MAX_LENGTH = 4000;
+
+/** Coerce `exchangeRequestId` from plain string or extended JSON `{ $oid }`. */
+function normalizeExchangeRequestIdInput(raw) {
+  if (raw == null) return '';
+  if (typeof raw === 'string') return raw.trim();
+  if (typeof raw === 'object' && typeof raw.$oid === 'string') return raw.$oid.trim();
+  return '';
+}
 
 async function displayNameFor(clerkUserId) {
-  try {
-    const user = await clerkClient.users.getUser(clerkUserId);
-    const first = user.firstName?.trim() || 'Reader';
-    const last = user.lastName?.trim();
-    return last ? `${first} ${last.charAt(0)}.` : first;
-  } catch {
-    return 'Reader';
-  }
+  return (await listerFullDisplayNameFromClerk(clerkUserId)) || 'Reader';
 }
 
 async function namesForIds(ids) {
@@ -40,7 +44,9 @@ function serializeReview(doc, nameById = {}) {
 
 export async function submitReview(req, res, next) {
   try {
-    const { exchangeRequestId, revieweeClerkUserId, rating, comment, evidencePhoto } = req.body ?? {};
+    const body = req.body ?? {};
+    const exchangeRequestId = normalizeExchangeRequestIdInput(body.exchangeRequestId);
+    const { revieweeClerkUserId, rating, comment, evidencePhoto } = body;
     if (!exchangeRequestId || !mongoose.isValidObjectId(exchangeRequestId)) {
       return res.status(400).json({ error: 'valid exchangeRequestId is required' });
     }
@@ -72,13 +78,24 @@ export async function submitReview(req, res, next) {
     if (dup) {
       return res.status(409).json({ error: 'A review was already submitted for this exchange' });
     }
+
+    const commentTrimmed = typeof comment === 'string' ? comment.trim() : '';
+    if (commentTrimmed.length < REVIEW_COMMENT_MIN_LENGTH) {
+      return res.status(400).json({
+        error: `Comment must be at least ${REVIEW_COMMENT_MIN_LENGTH} characters (${REVIEW_COMMENT_MAX_LENGTH} max)`,
+      });
+    }
+    if (commentTrimmed.length > REVIEW_COMMENT_MAX_LENGTH) {
+      return res.status(400).json({ error: `Comment cannot exceed ${REVIEW_COMMENT_MAX_LENGTH} characters` });
+    }
+
     try {
       const rev = await Review.create({
         reviewerClerkUserId: req.clerkUserId,
         revieweeClerkUserId: other,
         exchangeRequestId,
         rating: r,
-        comment: typeof comment === 'string' ? comment.trim().slice(0, 4000) : '',
+        comment: commentTrimmed.slice(0, REVIEW_COMMENT_MAX_LENGTH),
         evidencePhoto: typeof evidencePhoto === 'string' ? evidencePhoto.trim() : '',
       });
       const names = await namesForIds([rev.reviewerClerkUserId, rev.revieweeClerkUserId]);

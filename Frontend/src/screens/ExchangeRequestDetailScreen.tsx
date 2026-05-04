@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,6 +15,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -120,23 +121,39 @@ export function ExchangeRequestDetailScreen({ navigation, route }: Props) {
   const [editPhotoMime, setEditPhotoMime] = useState<string | null>(null);
   const [editBusy, setEditBusy] = useState(false);
 
-  const loadRequest = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.get<{ request: ExchangeRequest }>(`/api/requests/${requestId}`);
-      setRequest(res.data.request ?? null);
-    } catch (e: unknown) {
-      setError(apiErrorMessage(e, 'Could not load request'));
-      setRequest(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [requestId]);
+  /** First focus for this `requestId` shows the full-screen loader; later focuses (e.g. back from Write review) refresh quietly. */
+  const showFullLoadOnNextFocusRef = useRef(true);
 
   useEffect(() => {
-    void loadRequest();
-  }, [loadRequest]);
+    showFullLoadOnNextFocusRef.current = true;
+  }, [requestId]);
+
+  const loadRequest = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      const silent = !!opts?.silent;
+      if (!silent) setLoading(true);
+      setError(null);
+      try {
+        const res = await api.get<{ request: ExchangeRequest }>(`/api/requests/${requestId}`);
+        setRequest(res.data.request ?? null);
+      } catch (e: unknown) {
+        setError(apiErrorMessage(e, 'Could not load request'));
+        setRequest(null);
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [requestId]
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const silent = !showFullLoadOnNextFocusRef.current;
+      void loadRequest({ silent });
+      showFullLoadOnNextFocusRef.current = false;
+      return undefined;
+    }, [loadRequest])
+  );
 
   const isReceived = !!request && !!userId && request.ownerClerkUserId === userId;
   const isSent = !!request && !!userId && request.requesterClerkUserId === userId;
@@ -144,7 +161,7 @@ export function ExchangeRequestDetailScreen({ navigation, route }: Props) {
   const updateStatus = async (id: string, status: 'accepted' | 'rejected' | 'cancelled') => {
     try {
       await api.patch(`/api/requests/${id}`, { status });
-      await loadRequest();
+      await loadRequest({ silent: true });
     } catch (e: unknown) {
       Alert.alert('Error', apiErrorMessage(e, 'Could not update'));
     }
@@ -153,7 +170,7 @@ export function ExchangeRequestDetailScreen({ navigation, route }: Props) {
   const confirmReceipt = async (id: string) => {
     try {
       await api.post(`/api/requests/${id}/confirm-receipt`);
-      await loadRequest();
+      await loadRequest({ silent: true });
     } catch (e: unknown) {
       Alert.alert('Error', apiErrorMessage(e, 'Could not confirm receipt'));
     }
@@ -247,7 +264,7 @@ export function ExchangeRequestDetailScreen({ navigation, route }: Props) {
       setEditOpen(false);
       setEditPhotoLocalUri(null);
       setEditPhotoMime(null);
-      await loadRequest();
+      await loadRequest({ silent: true });
     } catch (e: unknown) {
       Alert.alert('Error', apiErrorMessage(e, 'Could not save changes'));
     } finally {

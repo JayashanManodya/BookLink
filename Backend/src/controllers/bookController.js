@@ -2,6 +2,12 @@ import mongoose from 'mongoose';
 import { clerkClient } from '@clerk/express';
 import { BOOK_TYPES } from '../constants/bookTypes.js';
 import { Book } from '../models/Book.js';
+import {
+  normalizePastPublicationYear,
+  titleBeginsWithDigit,
+  isLettersOnlyNameText,
+} from '../utils/bookFormValidation.js';
+import { listerFullDisplayNameFromClerk } from '../utils/listerDisplayName.js';
 
 const CONDITION_TYPES = ['new', 'good', 'poor'];
 
@@ -24,14 +30,8 @@ function stripPublicBookFields(book) {
 }
 
 async function ownerDisplayNameFor(clerkUserId) {
-  try {
-    const user = await clerkClient.users.getUser(clerkUserId);
-    const first = user.firstName?.trim() || 'Reader';
-    const last = user.lastName?.trim();
-    return last ? `${first} ${last.charAt(0)}.` : first;
-  } catch {
-    return 'Reader';
-  }
+  const full = await listerFullDisplayNameFromClerk(clerkUserId);
+  return full || 'Reader';
 }
 
 /** Profile image for book detail (Clerk); empty string on failure. */
@@ -125,7 +125,14 @@ export async function getBookById(req, res, next) {
     }
     const base = stripPublicBookFields(book);
     const ownerAvatarUrl = await ownerAvatarUrlFor(base.ownerClerkUserId);
-    return res.json({ book: { ...base, ownerAvatarUrl } });
+    const ownerDisplayLive = await listerFullDisplayNameFromClerk(base.ownerClerkUserId);
+    return res.json({
+      book: {
+        ...base,
+        ownerAvatarUrl,
+        ...(ownerDisplayLive ? { ownerDisplayName: ownerDisplayLive } : {}),
+      },
+    });
   } catch (err) {
     return next(err);
   }
@@ -184,6 +191,31 @@ export async function updateBook(req, res, next) {
       return res.status(400).json({ error: 'location is too long' });
     }
 
+    const titleT = String(title).trim();
+    const authorT = String(author).trim();
+    if (!titleT || !authorT) {
+      return res.status(400).json({ error: 'title and author are required' });
+    }
+    if (titleBeginsWithDigit(titleT)) {
+      return res.status(400).json({ error: 'Title cannot start with a number' });
+    }
+    if (!isLettersOnlyNameText(authorT)) {
+      return res.status(400).json({ error: 'Author must contain letters only' });
+    }
+    const langT = typeof language === 'string' ? language.trim() : '';
+    if (!isLettersOnlyNameText(langT)) {
+      return res.status(400).json({ error: 'Language must contain letters only' });
+    }
+    const yearNorm = normalizePastPublicationYear(year);
+    if (yearNorm === null) {
+      return res.status(400).json({ error: 'Invalid publication year' });
+    }
+    const coverTrimmed =
+      typeof coverImageUrl === 'string' ? coverImageUrl.trim() : '';
+    if (!coverTrimmed) {
+      return res.status(400).json({ error: 'cover image is required' });
+    }
+
     const cond = normalizeCondition(condition);
 
     const book = await Book.findById(id);
@@ -194,17 +226,15 @@ export async function updateBook(req, res, next) {
       return res.status(403).json({ error: 'Only the owner can edit this listing' });
     }
 
-    book.title = String(title).trim();
-    book.author = String(author).trim();
+    book.title = titleT;
+    book.author = authorT;
     book.description = typeof description === 'string' ? description.trim() : '';
     book.location = typeof location === 'string' ? location.trim() : '';
-    book.language = typeof language === 'string' ? language.trim() : '';
-    if (typeof coverImageUrl === 'string') {
-      book.coverImageUrl = coverImageUrl;
-    }
+    book.language = langT;
     book.bookType = bookType.trim();
+    book.coverImageUrl = coverTrimmed;
     book.condition = cond;
-    book.year = typeof year === 'number' && Number.isFinite(year) ? year : undefined;
+    book.year = yearNorm === undefined ? undefined : yearNorm;
 
     await book.save();
     const lean = book.toObject();
@@ -229,20 +259,43 @@ export async function createBook(req, res, next) {
     if (typeof location === 'string' && location.length > 120) {
       return res.status(400).json({ error: 'location is too long' });
     }
+    const titleT = String(title).trim();
+    const authorT = String(author).trim();
+    if (!titleT || !authorT) {
+      return res.status(400).json({ error: 'title and author are required' });
+    }
+    if (titleBeginsWithDigit(titleT)) {
+      return res.status(400).json({ error: 'Title cannot start with a number' });
+    }
+    if (!isLettersOnlyNameText(authorT)) {
+      return res.status(400).json({ error: 'Author must contain letters only' });
+    }
+    const langT = typeof language === 'string' ? language.trim() : '';
+    if (!isLettersOnlyNameText(langT)) {
+      return res.status(400).json({ error: 'Language must contain letters only' });
+    }
+    const yearNorm = normalizePastPublicationYear(year);
+    if (yearNorm === null) {
+      return res.status(400).json({ error: 'Invalid publication year' });
+    }
+    const coverTrimmed = typeof coverImageUrl === 'string' ? coverImageUrl.trim() : '';
+    if (!coverTrimmed) {
+      return res.status(400).json({ error: 'cover image is required' });
+    }
     const cond = normalizeCondition(condition);
     const ownerDisplayName = await ownerDisplayNameFor(req.clerkUserId);
     const book = await Book.create({
-      title,
-      author,
+      title: titleT,
+      author: authorT,
       description: typeof description === 'string' ? description.trim() : '',
       location: typeof location === 'string' ? location.trim() : '',
-      language: typeof language === 'string' ? language : '',
-      coverImageUrl: coverImageUrl ?? '',
+      language: langT,
+      coverImageUrl: coverTrimmed,
       ownerClerkUserId: req.clerkUserId,
       ownerDisplayName,
       bookType: bookType.trim(),
       condition: cond,
-      year: typeof year === 'number' && Number.isFinite(year) ? year : undefined,
+      ...(yearNorm !== undefined ? { year: yearNorm } : {}),
       listingStatus: 'available',
     });
     const lean = book.toObject();

@@ -16,9 +16,11 @@ import { cascadingWhite, dreamland, lead, textSecondary, themePrimary, themeSurf
 type Props = {
   value: string;
   onChange: (city: string) => void;
+  /** Inline validation message; also styles the trigger. */
+  error?: string | null;
 };
 
-export function CityDictionarySelect({ value, onChange }: Props) {
+export function CityDictionarySelect({ value, onChange, error }: Props) {
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -45,7 +47,11 @@ export function CityDictionarySelect({ value, onChange }: Props) {
       <Text style={styles.label}>City</Text>
       <Pressable
         onPress={() => setOpen(true)}
-        style={({ pressed }) => [styles.trigger, pressed && styles.triggerPressed]}
+        style={({ pressed }) => [
+          styles.trigger,
+          error ? styles.triggerError : null,
+          pressed && styles.triggerPressed,
+        ]}
         accessibilityRole="button"
         accessibilityLabel="Select city"
       >
@@ -54,6 +60,7 @@ export function CityDictionarySelect({ value, onChange }: Props) {
         </Text>
         <Ionicons name="chevron-down" size={20} color={warmHaze} />
       </Pressable>
+      {error ? <Text style={styles.fieldError}>{error}</Text> : null}
 
       <Modal visible={open} animationType="slide" transparent onRequestClose={close}>
         <View style={styles.modalBackdrop}>
@@ -124,7 +131,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   triggerPressed: { opacity: 0.92 },
+  triggerError: { borderColor: '#b3261e' },
   triggerText: { flex: 1, fontSize: 16, color: lead, fontWeight: '600' },
+  fieldError: { marginTop: 4, fontSize: 13, fontWeight: '600', color: '#b3261e' },
   triggerPlaceholder: { color: warmHaze, fontWeight: '500' },
   modalBackdrop: {
     flex: 1,

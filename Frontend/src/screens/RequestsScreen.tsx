@@ -72,7 +72,7 @@ function relativeListingAge(iso?: string): string {
   }
 }
 
-export function RequestsScreen({ navigation }: Props) {
+export function RequestsScreen({ navigation, route }: Props) {
   const { isSignedIn } = useAuth();
   const [tab, setTab] = useState<TabKey>('received');
   const [requests, setRequests] = useState<ExchangeRequest[]>([]);
@@ -99,6 +99,14 @@ export function RequestsScreen({ navigation }: Props) {
       if (!isSignedIn) return;
       void load();
     }, [isSignedIn, tab, load])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!route.params?.preferSentTab) return;
+      setTab('sent');
+      navigation.setParams({ preferSentTab: undefined });
+    }, [navigation, route.params?.preferSentTab])
   );
 
   if (!isSignedIn) {

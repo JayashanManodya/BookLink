@@ -9,6 +9,8 @@ export type WishlistItem = {
   subject?: string;
   grade?: string;
   language?: string;
+  /** Expected publication edition year (optional, wanted posts only) */
+  year?: number;
   urgency: 'high' | 'medium' | 'low';
   wantedBookPhoto?: string;
   status?: 'open' | 'fulfilled';

@@ -1,11 +1,21 @@
 import mongoose from 'mongoose';
 import { clerkClient } from '@clerk/express';
+import { BOOK_TYPES } from '../constants/bookTypes.js';
 import { Book } from '../models/Book.js';
 import { CollectionPoint } from '../models/CollectionPoint.js';
 import { WishlistItem } from '../models/WishlistItem.js';
 import { WishlistThread } from '../models/WishlistThread.js';
 import { WishlistThreadMessage } from '../models/WishlistThreadMessage.js';
 import { normalizeChatImageUrl } from '../utils/chatImageUrl.js';
+import {
+  normalizeMeetupContactNumber,
+  parseMeetupAtRequiredFuture,
+} from '../utils/meetupValidation.js';
+import {
+  normalizePastPublicationYear,
+  titleBeginsWithDigit,
+  isLettersOnlyNameText,
+} from '../utils/bookFormValidation.js';
 
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -173,23 +183,54 @@ export async function getWishlistMatches(req, res, next) {
 
 export async function createWishlistItem(req, res, next) {
   try {
-    const { title, author, description, subject, grade, language, urgency, wantedBookPhoto } = req.body ?? {};
+    const { title, author, description, subject, grade, language, urgency, wantedBookPhoto, year } = req.body ?? {};
     if (!title || typeof title !== 'string') {
       return res.status(400).json({ error: 'title is required' });
+    }
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      return res.status(400).json({ error: 'title cannot be empty' });
+    }
+    if (titleBeginsWithDigit(trimmedTitle)) {
+      return res.status(400).json({ error: 'Title cannot start with a number' });
+    }
+    const authorTrim = typeof author === 'string' ? author.trim() : '';
+    if (!isLettersOnlyNameText(authorTrim)) {
+      return res.status(400).json({ error: 'Author must contain letters only' });
+    }
+    const languageTrim = typeof language === 'string' ? language.trim() : '';
+    if (!isLettersOnlyNameText(languageTrim)) {
+      return res.status(400).json({
+        error:
+          'Language must use letters only (letters from any alphabet, spaces, apostrophes, hyphens, and periods — no digits). Leave blank if unspecified.',
+      });
+    }
+    const subjectTrim = typeof subject === 'string' ? subject.trim() : '';
+    if (subjectTrim !== '' && !BOOK_TYPES.includes(subjectTrim)) {
+      return res.status(400).json({ error: 'genre must be chosen from the supported genre list' });
+    }
+    const normalizedYear = normalizePastPublicationYear(year);
+    if (normalizedYear === null) {
+      return res.status(400).json({ error: 'Invalid publication year' });
+    }
+    const photoTrim = typeof wantedBookPhoto === 'string' ? wantedBookPhoto.trim() : '';
+    if (!photoTrim) {
+      return res.status(400).json({ error: 'wanted book photo is required' });
     }
     const u = ['high', 'medium', 'low'].includes(urgency) ? urgency : 'medium';
     const ownerDisplayName = await shortDisplayName(req.clerkUserId);
     const item = await WishlistItem.create({
       ownerClerkUserId: req.clerkUserId,
       ownerDisplayName,
-      title: title.trim(),
-      author: typeof author === 'string' ? author.trim() : '',
+      title: trimmedTitle,
+      author: authorTrim,
       description: typeof description === 'string' ? description.trim() : '',
-      subject: typeof subject === 'string' ? subject.trim() : '',
+      subject: subjectTrim,
       grade: typeof grade === 'string' ? grade.trim() : '',
-      language: typeof language === 'string' ? language.trim() : '',
+      language: languageTrim,
       urgency: u,
-      wantedBookPhoto: typeof wantedBookPhoto === 'string' ? wantedBookPhoto.trim() : '',
+      ...(normalizedYear !== undefined ? { year: normalizedYear } : {}),
+      wantedBookPhoto: photoTrim,
       status: 'open',
     });
     return res.status(201).json({ item });
@@ -221,25 +262,44 @@ export async function updateWishlistItem(req, res, next) {
       status,
       wantedBookPhoto,
       description,
+      year,
     } = req.body ?? {};
     if (typeof title === 'string') {
       const t = title.trim();
       if (!t) {
         return res.status(400).json({ error: 'title cannot be empty' });
       }
+      if (titleBeginsWithDigit(t)) {
+        return res.status(400).json({ error: 'Title cannot start with a number' });
+      }
       item.title = t;
     }
     if (typeof author === 'string') {
-      item.author = author.trim();
+      const a = author.trim();
+      if (!isLettersOnlyNameText(a)) {
+        return res.status(400).json({ error: 'Author must contain letters only' });
+      }
+      item.author = a;
     }
     if (typeof subject === 'string') {
-      item.subject = subject.trim();
+      const s = subject.trim();
+      if (s !== '' && !BOOK_TYPES.includes(s)) {
+        return res.status(400).json({ error: 'genre must be chosen from the supported genre list' });
+      }
+      item.subject = s;
     }
     if (typeof grade === 'string') {
       item.grade = grade.trim();
     }
     if (typeof language === 'string') {
-      item.language = language.trim();
+      const l = language.trim();
+      if (!isLettersOnlyNameText(l)) {
+        return res.status(400).json({
+          error:
+            'Language must use letters only (letters from any alphabet, spaces, apostrophes, hyphens, and periods — no digits). Leave blank if unspecified.',
+        });
+      }
+      item.language = l;
     }
     if (['high', 'medium', 'low'].includes(urgency)) {
       item.urgency = urgency;
@@ -248,12 +308,34 @@ export async function updateWishlistItem(req, res, next) {
       item.status = status;
     }
     if (typeof wantedBookPhoto === 'string') {
-      item.wantedBookPhoto = wantedBookPhoto.trim();
+      const p = wantedBookPhoto.trim();
+      if (!p) {
+        return res.status(400).json({ error: 'wanted book photo is required' });
+      }
+      item.wantedBookPhoto = p;
     }
     if (typeof description === 'string') {
       item.description = description.trim();
     }
+    let unsetWishlistYear = false;
+    if ('year' in (req.body ?? {})) {
+      const yrRaw = year;
+      if (yrRaw === null || yrRaw === '') {
+        unsetWishlistYear = true;
+      } else {
+        const normalizedYear = normalizePastPublicationYear(yrRaw);
+        if (normalizedYear === null) {
+          return res.status(400).json({ error: 'Invalid publication year' });
+        }
+        if (normalizedYear !== undefined) {
+          item.year = normalizedYear;
+        }
+      }
+    }
     await item.save();
+    if (unsetWishlistYear) {
+      await WishlistItem.collection.updateOne({ _id: item._id }, { $unset: { year: '' } });
+    }
     return res.json({ item });
   } catch (err) {
     return next(err);
@@ -451,24 +533,6 @@ export async function listMyWishlistChats(req, res, next) {
   }
 }
 
-function parseMeetupAt(raw) {
-  if (raw == null) return { ok: false, error: 'meetupAt is required (ISO date-time)' };
-  const d = new Date(typeof raw === 'string' ? raw.trim() : raw);
-  if (Number.isNaN(d.getTime())) {
-    return { ok: false, error: 'meetupAt must be a valid date and time' };
-  }
-  return { ok: true, date: d };
-}
-
-function normalizeMeetupContact(raw) {
-  if (typeof raw !== 'string') return { ok: false, error: 'meetupContactNumber is required' };
-  const t = raw.trim().replace(/\s+/g, ' ');
-  if (t.length < 5 || t.length > 40) {
-    return { ok: false, error: 'meetupContactNumber must be 5\u201340 characters' };
-  }
-  return { ok: true, value: t };
-}
-
 export async function getWishlistThread(req, res, next) {
   try {
     const { threadId } = req.params;
@@ -494,11 +558,11 @@ export async function setWishlistThreadMeetup(req, res, next) {
     if (!collectionPointId || !mongoose.isValidObjectId(String(collectionPointId))) {
       return res.status(400).json({ error: 'valid collectionPointId is required' });
     }
-    const when = parseMeetupAt(meetupAt);
+    const when = parseMeetupAtRequiredFuture(meetupAt);
     if (!when.ok) {
       return res.status(400).json({ error: when.error });
     }
-    const phone = normalizeMeetupContact(meetupContactNumber);
+    const phone = normalizeMeetupContactNumber(meetupContactNumber);
     if (!phone.ok) {
       return res.status(400).json({ error: phone.error });
     }

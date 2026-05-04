@@ -21,6 +21,7 @@ import { useAuth } from '@clerk/clerk-expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChatImageLightbox } from '../components/ChatImageLightbox';
 import { ChatMessageRow } from '../components/ChatMessageRow';
+import { MeetupDateTimePickers } from '../components/MeetupDateTimePickers';
 import { api, apiErrorMessage } from '../lib/api';
 import { alertOk } from '../lib/platformAlert';
 import { pickChatImageFromLibrary } from '../lib/pickChatImage';
@@ -44,40 +45,16 @@ import {
 import { cascadingWhite, dreamland, lead, textSecondary, warmHaze, themeSurfaceMuted } from '../theme/colors';
 import { themeGreen, themeMuted } from '../theme/courseTheme';
 
+import {
+  combineLocalDateTimeToISO,
+  defaultMeetupWhenDate,
+  localDateToMeetupStrings,
+  meetupContactValidationError,
+  meetupDateTimeFutureError,
+  sanitizeMeetupPhoneDigits,
+} from '../lib/meetupFormRules';
+
 type Props = NativeStackScreenProps<RequestsStackParamList, 'RequestChat'>;
-
-function pad2(n: number) {
-  return n < 10 ? `0${n}` : String(n);
-}
-
-function defaultMeetupDateStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-}
-
-function defaultMeetupTimeStr() {
-  const d = new Date();
-  d.setMinutes(0, 0, 0);
-  d.setHours(d.getHours() + 1);
-  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-}
-
-/** Combine local date (YYYY-MM-DD) and time (HH:mm) into ISO UTC for the API. */
-function combineLocalDateTimeToISO(dateStr: string, timeStr: string): string | null {
-  const dPart = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
-  const tPart = /^(\d{1,2}):(\d{2})$/.exec(timeStr.trim());
-  if (!dPart || !tPart) return null;
-  const y = Number(dPart[1]);
-  const mo = Number(dPart[2]);
-  const day = Number(dPart[3]);
-  const hh = Number(tPart[1]);
-  const mm = Number(tPart[2]);
-  if (![y, mo, day, hh, mm].every((n) => Number.isFinite(n))) return null;
-  if (hh > 23 || hh < 0 || mm > 59 || mm < 0) return null;
-  const dt = new Date(y, mo - 1, day, hh, mm, 0, 0);
-  if (Number.isNaN(dt.getTime())) return null;
-  return dt.toISOString();
-}
 
 function formatMeetupWhen(iso?: string | null) {
   if (!iso) return '';
@@ -123,8 +100,7 @@ export function RequestChatScreen({ navigation, route }: Props) {
   const [meetupModal, setMeetupModal] = useState(false);
   const [meetupStep, setMeetupStep] = useState<'pick' | 'details'>('pick');
   const [selectedPoint, setSelectedPoint] = useState<CollectionPoint | null>(null);
-  const [meetupDateStr, setMeetupDateStr] = useState('');
-  const [meetupTimeStr, setMeetupTimeStr] = useState('');
+  const [meetupWhen, setMeetupWhen] = useState<Date>(() => defaultMeetupWhenDate());
   const [meetupContactStr, setMeetupContactStr] = useState('');
   const [lightboxUri, setLightboxUri] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
@@ -219,17 +195,15 @@ export function RequestChatScreen({ navigation, route }: Props) {
     void loadPoints();
     setMeetupStep('pick');
     setSelectedPoint(null);
-    setMeetupDateStr(defaultMeetupDateStr());
-    setMeetupTimeStr(defaultMeetupTimeStr());
+    setMeetupWhen(defaultMeetupWhenDate());
     setMeetupContactStr('');
     setMeetupModal(true);
   };
 
   const goMeetupDetails = (p: CollectionPoint) => {
     setSelectedPoint(p);
-    setMeetupDateStr(defaultMeetupDateStr());
-    setMeetupTimeStr(defaultMeetupTimeStr());
-    setMeetupContactStr(p.contactNumber?.trim() || '');
+    setMeetupWhen(defaultMeetupWhenDate());
+    setMeetupContactStr(sanitizeMeetupPhoneDigits(p.contactNumber ?? ''));
     setMeetupStep('details');
   };
 
@@ -238,14 +212,21 @@ export function RequestChatScreen({ navigation, route }: Props) {
       alertOk('Meet-up', 'Pick a collection point first.');
       return;
     }
-    const meetupAt = combineLocalDateTimeToISO(meetupDateStr, meetupTimeStr);
-    if (!meetupAt) {
-      alertOk('Date & time', 'Use date as YYYY-MM-DD and time as HH:mm (24-hour), e.g. 14:30.');
+    const { dateStr, timeStr } = localDateToMeetupStrings(meetupWhen);
+    const whenErr = meetupDateTimeFutureError(dateStr, timeStr);
+    if (whenErr) {
+      alertOk('Date & time', whenErr);
       return;
     }
-    const contact = meetupContactStr.trim();
-    if (contact.length < 5) {
-      alertOk('Contact', 'Enter a contact number (at least 5 characters).');
+    const contactDigits = sanitizeMeetupPhoneDigits(meetupContactStr);
+    const contactErr = meetupContactValidationError(contactDigits);
+    if (contactErr) {
+      alertOk('Contact', contactErr);
+      return;
+    }
+    const meetupAt = combineLocalDateTimeToISO(dateStr, timeStr);
+    if (!meetupAt) {
+      alertOk('Date & time', 'Use date as YYYY-MM-DD and time as HH:mm (24-hour), e.g. 14:30.');
       return;
     }
     setMeetupBusy(true);
@@ -253,7 +234,7 @@ export function RequestChatScreen({ navigation, route }: Props) {
       await api.patch(`/api/requests/${requestId}/meetup`, {
         collectionPointId: selectedPoint._id,
         meetupAt,
-        meetupContactNumber: contact,
+        meetupContactNumber: contactDigits,
       });
       closeMeetupModal();
       await load();
@@ -265,6 +246,12 @@ export function RequestChatScreen({ navigation, route }: Props) {
   };
 
   const subtitle = useMemo(() => `About: ${bookTitle}`, [bookTitle]);
+
+  const chatRoleSubtitle = useMemo(() => {
+    if (!request || !userId) return '';
+    if (request.ownerClerkUserId === userId) return 'Received — people asking about your book';
+    return 'Sent — swap thread you opened';
+  }, [request, userId]);
 
   const leaveChat = useCallback(() => {
     if (navigation.canGoBack()) {
@@ -298,6 +285,11 @@ export function RequestChatScreen({ navigation, route }: Props) {
           <Text style={styles.headSub} numberOfLines={1}>
             {subtitle}
           </Text>
+          {chatRoleSubtitle ? (
+            <Text style={styles.headRoleLine} numberOfLines={2}>
+              {chatRoleSubtitle}
+            </Text>
+          ) : null}
         </View>
         <View style={styles.topBarSpacer} />
       </View>
@@ -317,7 +309,7 @@ export function RequestChatScreen({ navigation, route }: Props) {
               onPress={() => {
                 const raw = request.meetupContactNumber ?? '';
                 const tel = raw.replace(/[^\d+]/g, '');
-                if (tel.length >= 5) void Linking.openURL(`tel:${tel}`);
+                if (tel.length >= 10) void Linking.openURL(`tel:${tel}`);
               }}
               style={styles.meetupContactRow}
             >
@@ -484,39 +476,24 @@ export function RequestChatScreen({ navigation, route }: Props) {
                   </View>
                 ) : null}
                 <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 360 }}>
-                  <View style={styles.modalField}>
-                    <Text style={styles.modalFieldLabel}>Date</Text>
-                    <TextInput
-                      value={meetupDateStr}
-                      onChangeText={setMeetupDateStr}
-                      placeholder="YYYY-MM-DD"
-                      placeholderTextColor={themeMuted}
-                      style={styles.modalInput}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  </View>
-                  <View style={styles.modalField}>
-                    <Text style={styles.modalFieldLabel}>Time (24h)</Text>
-                    <TextInput
-                      value={meetupTimeStr}
-                      onChangeText={setMeetupTimeStr}
-                      placeholder="HH:mm"
-                      placeholderTextColor={themeMuted}
-                      style={styles.modalInput}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  </View>
+                  <MeetupDateTimePickers
+                    value={meetupWhen}
+                    onChange={setMeetupWhen}
+                    disabled={meetupBusy}
+                    dateHint="Must be today or a future calendar day."
+                    timeHint="Together with date, cannot be in the past."
+                  />
                   <View style={styles.modalField}>
                     <Text style={styles.modalFieldLabel}>Your contact number</Text>
                     <TextInput
                       value={meetupContactStr}
-                      onChangeText={setMeetupContactStr}
-                      placeholder="Shown to the other reader for this handoff"
+                      onChangeText={(t) => setMeetupContactStr(sanitizeMeetupPhoneDigits(t))}
+                      placeholder="10 digits — e.g. 0770123456"
                       placeholderTextColor={themeMuted}
                       style={styles.modalInput}
-                      keyboardType="phone-pad"
+                      keyboardType="number-pad"
+                      maxLength={10}
+                      inputMode="numeric"
                     />
                   </View>
                   <Text style={styles.modalHint}>Times use your device’s local timezone.</Text>
@@ -602,6 +579,7 @@ const styles = StyleSheet.create({
   headTxtWrap: { flex: 1, alignItems: 'center' },
   headTitle: { fontSize: 17, fontWeight: '800', color: lead },
   headSub: { marginTop: 2, fontSize: 12, color: textSecondary, maxWidth: '90%' },
+  headRoleLine: { marginTop: 2, fontSize: 11, fontWeight: '600', color: themeMuted, maxWidth: '95%' },
   meetupBanner: {
     marginHorizontal: 12,
     marginBottom: 6,
@@ -776,6 +754,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: lead,
+  },
+  modalFieldMicro: {
+    fontSize: 12,
+    color: themeMuted,
+    marginTop: 6,
+    lineHeight: 16,
   },
   modalHint: { fontSize: 13, color: textSecondary, marginBottom: 8, lineHeight: 18 },
   modalActionsRow: { flexDirection: 'row', gap: 10, marginTop: 8 },

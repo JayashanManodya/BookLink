@@ -17,16 +17,25 @@ import { FormImageAttachment } from '../components/FormImageAttachment';
 import { api, apiErrorMessage } from '../lib/api';
 import { alertOk } from '../lib/platformAlert';
 import type { RequestsStackParamList } from '../navigation/requestsStackTypes';
-import { cascadingWhite, dreamland, lead, textSecondary, warmHaze, themePageBg, themePrimary, themeSurfaceMuted } from '../theme/colors';
+import { dreamland, lead, textSecondary, themeDanger, warmHaze, themePageBg, themePrimary, themeSurfaceMuted } from '../theme/colors';
 import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { cardShadow } from '../theme/shadows';
+import {
+  isValidMongoIdHex,
+  normalizeMongoId,
+  REVIEW_COMMENT_MAX_LENGTH,
+  REVIEW_COMMENT_MIN_LENGTH,
+  validateReviewComment,
+  validateReviewRating,
+} from '../lib/reviewFormRules';
 
 type Props = NativeStackScreenProps<RequestsStackParamList, 'WriteReview'>;
 
 export function WriteReviewScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
-  const { exchangeRequestId, revieweeClerkUserId, revieweeName } = route.params;
-  const [rating, setRating] = useState(5);
+  const { exchangeRequestId: exchangeIdRaw, revieweeClerkUserId, revieweeName } = route.params;
+  const exchangeRequestId = normalizeMongoId(exchangeIdRaw);
+  const [rating, setRating] = useState<number | null>(null);
   const [comment, setComment] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoMime, setPhotoMime] = useState<string | null>(null);
@@ -72,6 +81,27 @@ export function WriteReviewScreen({ navigation, route }: Props) {
   };
 
   const submit = async () => {
+    if (!isValidMongoIdHex(exchangeRequestId)) {
+      alertOk('Error', 'Invalid exchange reference. Go back and open the review action again.');
+      return;
+    }
+    const clerkErr =
+      typeof revieweeClerkUserId === 'string' && revieweeClerkUserId.trim().length > 0 ? null : 'Missing lister.';
+    if (clerkErr) {
+      alertOk('Error', clerkErr);
+      return;
+    }
+    const ratingErr = validateReviewRating(rating);
+    if (ratingErr) {
+      alertOk('Rating', ratingErr);
+      return;
+    }
+    const commentErr = validateReviewComment(comment);
+    if (commentErr) {
+      alertOk('Comment', commentErr);
+      return;
+    }
+
     setBusy(true);
     try {
       let evidencePhoto = '';
@@ -107,23 +137,37 @@ export function WriteReviewScreen({ navigation, route }: Props) {
       >
         <Text style={styles.head}>Rate {revieweeName}</Text>
         <Text style={styles.subHead}>One review per exchange. After you submit, you cannot add another for this swap.</Text>
-        <Text style={styles.label}>Rating</Text>
+        <Text style={styles.label}>
+          Rating <Text style={styles.reqStar}>*</Text>
+        </Text>
         <View style={styles.starsRow}>
           {[1, 2, 3, 4, 5].map((n) => (
             <Pressable key={n} onPress={() => setRating(n)} hitSlop={6}>
-              <Text style={[styles.starBtn, n <= rating && styles.starOn]}>{n <= rating ? '\u2605' : '\u2606'}</Text>
+              <Text style={[styles.starBtn, rating != null && n <= rating ? styles.starOn : null]}>
+                {rating != null && n <= rating ? '\u2605' : '\u2606'}
+              </Text>
             </Pressable>
           ))}
         </View>
-        <Text style={styles.label}>Comment</Text>
+        {rating == null ? (
+          <Text style={styles.helper}>Tap stars to rate this swap.</Text>
+        ) : null}
+        <Text style={styles.label}>
+          Comment <Text style={styles.reqStar}>*</Text>
+        </Text>
         <TextInput
           value={comment}
-          onChangeText={setComment}
-          placeholder="How did the swap go?"
+          onChangeText={(t) =>
+            setComment(t.length <= REVIEW_COMMENT_MAX_LENGTH ? t : t.slice(0, REVIEW_COMMENT_MAX_LENGTH))
+          }
+          placeholder="How did the swap go? (You can start with a number.)"
           placeholderTextColor={warmHaze}
           style={styles.input}
           multiline
         />
+        <Text style={styles.counter}>
+          {comment.trim().length}/{REVIEW_COMMENT_MIN_LENGTH}+ characters (max {REVIEW_COMMENT_MAX_LENGTH})
+        </Text>
         <FormImageAttachment
           previewUri={photoUri}
           onPick={pick}
@@ -150,9 +194,12 @@ const styles = StyleSheet.create({
   head: { fontSize: 22, fontWeight: '800', color: lead },
   subHead: { fontSize: 14, color: textSecondary, lineHeight: 20, marginTop: 4 },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
+  reqStar: { color: themeDanger, fontWeight: '800' },
   starsRow: { flexDirection: 'row', gap: 8 },
   starBtn: { fontSize: 32, color: dreamland },
   starOn: { color: '#e6b800' },
+  helper: { fontSize: 13, color: textSecondary },
+  counter: { fontSize: 12, color: warmHaze, marginTop: -4 },
   input: {
     minHeight: 100,
     backgroundColor: themeSurfaceMuted,

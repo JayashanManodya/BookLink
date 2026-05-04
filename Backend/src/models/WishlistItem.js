@@ -11,6 +11,8 @@ const wishlistItemSchema = new mongoose.Schema(
     grade: { type: String, trim: true, default: '' },
     language: { type: String, trim: true, default: '' },
     urgency: { type: String, enum: ['high', 'medium', 'low'], default: 'medium', index: true },
+    /** Preferred / expected publication edition year (optional) */
+    year: { type: Number },
     wantedBookPhoto: { type: String, trim: true, default: '' },
     status: {
       type: String,

@@ -134,11 +134,13 @@ export function BookDetailScreen({ navigation, route }: Props) {
   const subtitle =
     subtitleParts.length > 0 ? subtitleParts.join(' · ') : 'Listed for community swap';
 
-  const openReviews = () => {
+  const openListerProfile = () => {
     if (!book?.ownerClerkUserId) return;
     navigation.navigate('UserReviews', {
       clerkUserId: book.ownerClerkUserId,
       displayName: ownerName,
+      avatarUrl: book.ownerAvatarUrl ?? undefined,
+      listingLocationHint: book.location?.trim() || undefined,
     });
   };
 
@@ -322,7 +324,7 @@ export function BookDetailScreen({ navigation, route }: Props) {
 
           <Pressable
             onPress={() => {
-              if (isSignedIn && book.ownerClerkUserId) openReviews();
+              if (isSignedIn && book.ownerClerkUserId) openListerProfile();
             }}
             disabled={!isSignedIn || !book.ownerClerkUserId}
             android_ripple={{ color: 'rgba(0,0,0,0.04)' }}
@@ -344,6 +346,7 @@ export function BookDetailScreen({ navigation, route }: Props) {
                 <Text style={[styles.mentorRole, { fontFamily: font.medium }]}>
                   Listed this book
                   {listedDate ? ` · ${listedDate}` : ''}
+                  {isSignedIn && book.ownerClerkUserId ? ' · Tap for profile & reviews' : ''}
                 </Text>
                 <View style={styles.mentorRatingRow}>
                   <Ionicons name="star" size={14} color={themeOrange} />
@@ -403,7 +406,8 @@ export function BookDetailScreen({ navigation, route }: Props) {
           ) : (
             <Pressable
               style={({ pressed }) => [styles.primaryBtn, pressed && styles.primaryPressed]}
-              onPress={() => navigation.navigate('RequestExchange', { bookId: book._id, title: book.title })}
+              onPress={() =>
+                navigation.navigate('RequestExchange', { bookId: String(book._id), title: book.title })}
               android_ripple={{ color: 'rgba(255,255,255,0.2)' }}
             >
               <Text style={[styles.primaryBtnText, { fontFamily: font.bold }]}>Request exchange</Text>

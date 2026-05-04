@@ -1,5 +1,15 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -7,11 +17,30 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FormImageAttachment } from '../components/FormImageAttachment';
 import { api, apiErrorMessage } from '../lib/api';
 import { alertOk } from '../lib/platformAlert';
+import { BOOK_TYPES, type BookType } from '../constants/bookTypes';
 import type { WishlistStackParamList } from '../navigation/wishlistStackTypes';
 import type { WishlistItem } from '../types/wishlist';
-import { cascadingWhite, dreamland, lead, textSecondary, warmHaze, themePageBg, themePrimary, themeSurfaceMuted } from '../theme/colors';
+import {
+  cascadingWhite,
+  dreamland,
+  lead,
+  textSecondary,
+  themeDanger,
+  warmHaze,
+  themePageBg,
+  themePrimary,
+  themeSurfaceMuted,
+} from '../theme/colors';
 import { FORM_SCROLL_GAP } from '../theme/formLayout';
 import { cardShadow } from '../theme/shadows';
+import {
+  MIN_PUBLICATION_YEAR,
+  publicationYearPastOptions,
+  trimmedTitleBeginsWithDigit,
+  isLettersOnlyNameText,
+  filterToLettersOnlyNameText,
+  maxPastPublicationYear,
+} from '../lib/bookFormText';
 
 type Props = NativeStackScreenProps<WishlistStackParamList, 'PostWanted'>;
 
@@ -24,7 +53,7 @@ export function PostWantedBookScreen({ navigation, route }: Props) {
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [description, setDescription] = useState('');
-  const [subject, setSubject] = useState('');
+  const [genre, setGenre] = useState<BookType | ''>('');
   const [language, setLanguage] = useState('');
   const [urgency, setUrgency] = useState<(typeof URGENCY)[number]>('medium');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -32,6 +61,11 @@ export function PostWantedBookScreen({ navigation, route }: Props) {
   const [existingPhotoUrl, setExistingPhotoUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [loadingEdit, setLoadingEdit] = useState(isEdit);
+  const [year, setYear] = useState<number | null>(null);
+  const [yearModal, setYearModal] = useState(false);
+  const [genreModal, setGenreModal] = useState(false);
+
+  const yearOptions = useMemo(() => publicationYearPastOptions(MIN_PUBLICATION_YEAR), []);
 
   useEffect(() => {
     if (!editItemId) return;
@@ -44,7 +78,8 @@ export function PostWantedBookScreen({ navigation, route }: Props) {
         setTitle(it.title ?? '');
         setAuthor(it.author ?? '');
         setDescription(it.description ?? '');
-        setSubject(it.subject ?? '');
+        const g = typeof it.subject === 'string' && BOOK_TYPES.includes(it.subject as BookType) ? (it.subject as BookType) : '';
+        setGenre(g);
         setLanguage(it.language ?? '');
         setUrgency(
           (['high', 'medium', 'low'] as const).includes(it.urgency as 'high' | 'medium' | 'low')
@@ -52,6 +87,9 @@ export function PostWantedBookScreen({ navigation, route }: Props) {
             : 'medium'
         );
         setExistingPhotoUrl(it.wantedBookPhoto ?? '');
+        const pastMax = maxPastPublicationYear();
+        const yNum = typeof it.year === 'number' && Number.isFinite(it.year) ? it.year : null;
+        setYear(yNum !== null && yNum >= MIN_PUBLICATION_YEAR && yNum <= pastMax ? yNum : null);
       } catch (e: unknown) {
         if (cancelled) return;
         alertOk('Error', apiErrorMessage(e, 'Could not load wanted book'));
@@ -101,24 +139,66 @@ export function PostWantedBookScreen({ navigation, route }: Props) {
   };
 
   const submit = async () => {
-    if (!title.trim()) {
+    const ti = title.trim();
+    if (!ti) {
       alertOk('Title required', 'What book are you looking for?');
+      return;
+    }
+    if (trimmedTitleBeginsWithDigit(title)) {
+      alertOk('Invalid title', "Title can't start with a number.");
+      return;
+    }
+    const au = author.trim();
+    if (au && !isLettersOnlyNameText(au)) {
+      alertOk('Invalid author', 'Please check the author name.');
+      return;
+    }
+    const lang = language.trim();
+    if (lang !== '' && !isLettersOnlyNameText(lang)) {
+      alertOk('Invalid language', 'Please check the language.');
+      return;
+    }
+    const pastMax = maxPastPublicationYear();
+    if (
+      year !== null &&
+      (!Number.isFinite(year) || year < MIN_PUBLICATION_YEAR || year > pastMax)
+    ) {
+      alertOk(
+        'Invalid year',
+        pastMax < MIN_PUBLICATION_YEAR
+          ? `Pick a year from ${MIN_PUBLICATION_YEAR} onward.`
+          : `Pick a year from ${MIN_PUBLICATION_YEAR} to ${pastMax}.`
+      );
+      return;
+    }
+    const previewCombined = `${photoUri || ''}${existingPhotoUrl || ''}`.trim();
+    if (!previewCombined) {
+      alertOk('Photo required', 'Add a photo of the book you are looking for.');
       return;
     }
     const desc = description.trim();
     setBusy(true);
     try {
       const wantedBookPhoto = await uploadPhotoIfNeeded();
-      const payload = {
-        title: title.trim(),
-        author: author.trim(),
+      if (!wantedBookPhoto.trim()) {
+        alertOk('Photo required', 'Add a photo of the book you are looking for.');
+        return;
+      }
+      const payload: Record<string, unknown> = {
+        title: ti,
+        author: au,
         description: desc,
-        subject: subject.trim(),
+        subject: genre,
         grade: '',
-        language: language.trim(),
+        language: lang,
         urgency,
         wantedBookPhoto,
       };
+      if (year !== null) {
+        payload.year = year;
+      } else if (isEdit && editItemId) {
+        payload.year = null;
+      }
       if (isEdit && editItemId) {
         await api.put(`/api/wishlist/${editItemId}`, payload);
         alertOk('Saved', 'Your wanted book has been updated.', () => navigation.goBack());
@@ -128,8 +208,9 @@ export function PostWantedBookScreen({ navigation, route }: Props) {
           setTitle('');
           setAuthor('');
           setDescription('');
-          setSubject('');
+          setGenre('');
           setLanguage('');
+          setYear(null);
           setUrgency('medium');
           setPhotoUri(null);
           setPhotoMime(null);
@@ -178,6 +259,9 @@ export function PostWantedBookScreen({ navigation, route }: Props) {
             ? 'Update the details of your wanted book.'
             : 'Tell the community what you need. Other readers may offer a swap.'}
         </Text>
+        <Text style={styles.label}>
+          Book photo <Text style={styles.reqMark}>*</Text>
+        </Text>
         <FormImageAttachment
           previewUri={photoUri || existingPhotoUrl}
           onPick={pickPhoto}
@@ -186,10 +270,10 @@ export function PostWantedBookScreen({ navigation, route }: Props) {
             setPhotoMime(null);
             setExistingPhotoUrl('');
           }}
-          emptyHint="Tap to add wanted book photo"
+          emptyHint="Tap to add book photo (required)"
         />
         <Field label="Title" value={title} onChangeText={setTitle} placeholder="ICT Revision Guide 2024" />
-        <Field label="Author (optional)" value={author} onChangeText={setAuthor} />
+        <Field label="Author (optional)" value={author} onChangeText={(v) => setAuthor(filterToLettersOnlyNameText(v))} />
         <Field
           label="Description (optional)"
           value={description}
@@ -198,13 +282,32 @@ export function PostWantedBookScreen({ navigation, route }: Props) {
           multiline
           numberOfLines={4}
         />
-        <Field label="Language (optional)" value={language} onChangeText={setLanguage} placeholder="Sinhala" />
         <Field
-          label="Genre / book type (optional)"
-          value={subject}
-          onChangeText={setSubject}
-          placeholder="e.g. Fantasy — helps match listings"
+          label="Language (optional)"
+          value={language}
+          onChangeText={(v) => setLanguage(filterToLettersOnlyNameText(v))}
+          placeholder="Sinhala, English, Tamil…"
+          maxLength={80}
         />
+        <Text style={styles.label}>Book type / genre (optional)</Text>
+        <Pressable
+          style={styles.selectRow}
+          onPress={() => setGenreModal(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Select book type"
+        >
+          <Text style={[styles.selectVal, !genre && styles.selectPlaceholder]} numberOfLines={2}>
+            {genre || 'Select book type'}
+          </Text>
+          <Ionicons name="chevron-down" size={20} color={lead} />
+        </Pressable>
+        <Text style={styles.label}>Book year (optional)</Text>
+        <Pressable style={styles.selectRow} onPress={() => setYearModal(true)}>
+          <Text style={[styles.selectVal, year == null && styles.selectPlaceholder]}>
+            {year == null ? 'Not specified' : String(year)}
+          </Text>
+          <Ionicons name="chevron-down" size={20} color={lead} />
+        </Pressable>
         <Text style={styles.label}>Urgency</Text>
         <View style={styles.chipRow}>
           {URGENCY.map((u) => (
@@ -221,6 +324,64 @@ export function PostWantedBookScreen({ navigation, route }: Props) {
           )}
         </Pressable>
       </ScrollView>
+      <Modal visible={genreModal} animationType="slide" transparent onRequestClose={() => setGenreModal(false)}>
+        <View style={styles.modalRoot}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setGenreModal(false)} />
+          <View style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalHeaderTitle}>Book type</Text>
+              <Pressable onPress={() => setGenreModal(false)} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close book type menu">
+                <Text style={styles.modalDone}>Done</Text>
+              </Pressable>
+            </View>
+            <ScrollView style={{ maxHeight: 480 }} keyboardShouldPersistTaps="handled">
+              <Pressable
+                style={[styles.modalRow, genre === '' && styles.modalRowOn]}
+                onPress={() => {
+                  setGenre('');
+                  setGenreModal(false);
+                }}
+              >
+                <Text style={styles.modalRowTxt}>Not specified</Text>
+              </Pressable>
+              {BOOK_TYPES.map((g) => (
+                <Pressable
+                  key={g}
+                  style={[styles.modalRow, genre === g && styles.modalRowOn]}
+                  onPress={() => {
+                    setGenre(g);
+                    setGenreModal(false);
+                  }}
+                >
+                  <Text style={styles.modalRowTxt}>{g}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={yearModal} animationType="slide" transparent onRequestClose={() => setYearModal(false)}>
+        <View style={styles.modalRoot}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setYearModal(false)} />
+          <View style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+            <Text style={styles.modalSheetTitleStandalone}>Book year</Text>
+            <ScrollView style={{ maxHeight: 400 }} keyboardShouldPersistTaps="handled">
+              {yearOptions.map((yOpt) => (
+                <Pressable
+                  key={yOpt == null ? 'none' : yOpt}
+                  style={[styles.modalRow, year === yOpt && styles.modalRowOn]}
+                  onPress={() => {
+                    setYear(yOpt);
+                    setYearModal(false);
+                  }}
+                >
+                  <Text style={styles.modalRowTxt}>{yOpt == null ? 'Not specified' : String(yOpt)}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -232,6 +393,7 @@ function Field({
   placeholder,
   multiline,
   numberOfLines,
+  maxLength,
 }: {
   label: string;
   value: string;
@@ -239,6 +401,7 @@ function Field({
   placeholder?: string;
   multiline?: boolean;
   numberOfLines?: number;
+  maxLength?: number;
 }) {
   return (
     <View style={{ width: '100%', gap: 6 }}>
@@ -250,6 +413,7 @@ function Field({
         placeholderTextColor={warmHaze}
         multiline={multiline}
         numberOfLines={numberOfLines}
+        maxLength={maxLength}
         textAlignVertical={multiline ? 'top' : 'center'}
         style={[styles.input, multiline && styles.inputMultiline]}
       />
@@ -272,6 +436,7 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 20, paddingBottom: 40, paddingTop: 8 },
   hint: { fontSize: 14, color: textSecondary, lineHeight: 20 },
   label: { fontSize: 13, fontWeight: '700', color: warmHaze },
+  reqMark: { color: themeDanger, fontWeight: '800' },
   input: {
     backgroundColor: themeSurfaceMuted,
     borderRadius: 14,
@@ -296,6 +461,49 @@ const styles = StyleSheet.create({
   chipOn: { backgroundColor: themePrimary, borderColor: themePrimary },
   chipTxt: { fontSize: 14, fontWeight: '700', color: textSecondary, textTransform: 'capitalize' },
   chipTxtOn: { color: cascadingWhite },
+  selectRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: themeSurfaceMuted,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    gap: 12,
+  },
+  selectVal: { flex: 1, fontSize: 16, fontWeight: '600', color: lead },
+  selectPlaceholder: { color: warmHaze, fontWeight: '500' },
+  modalRoot: { flex: 1, justifyContent: 'flex-end' },
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)' },
+  modalSheet: {
+    backgroundColor: cascadingWhite,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    maxHeight: '85%',
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingBottom: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: dreamland,
+  },
+  modalHeaderTitle: { fontSize: 18, fontWeight: '800', color: lead, flex: 1 },
+  modalSheetTitleStandalone: { fontSize: 18, fontWeight: '800', color: lead, marginBottom: 10 },
+  modalDone: { fontSize: 16, fontWeight: '700', color: themePrimary },
+  modalRow: {
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: dreamland,
+  },
+  modalRowOn: { backgroundColor: themeSurfaceMuted },
+  modalRowTxt: { fontSize: 16, color: lead, fontWeight: '600' },
   submit: {
     marginTop: 12,
     backgroundColor: themePrimary,
