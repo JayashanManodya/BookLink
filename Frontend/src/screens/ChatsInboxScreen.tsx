@@ -1,8 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,12 +17,26 @@ import { ChatListRow } from '../components/ChatListRow';
 import { SignInGateCard } from '../components/SignInGateCard';
 import { api, apiErrorMessage } from '../lib/api';
 import type { RequestsStackParamList } from '../navigation/requestsStackTypes';
-import { themeGreen, themeMuted, themeNavMintBorder } from '../theme/courseTheme';
-import { lead, textSecondary } from '../theme/colors';
+import {
+  themeCard,
+  themeInboxSearchBorder,
+  themeInboxTabActiveBg,
+  themeInboxTabInactiveBg,
+  themeInboxTopBorder,
+  themeMuted,
+  themePageBg,
+  themePrimary,
+  themeInk,
+} from '../theme/courseTheme';
+import { textSecondary } from '../theme/colors';
 import { font } from '../theme/typography';
+
+type ExchangeInboxTab = 'sent' | 'received';
 
 type InboxChatExchange = {
   kind: 'exchange';
+  /** Present when `kind` is `exchange`; omitted on older API responses (treated as received). */
+  exchangeRole?: 'sent' | 'received';
   requestId: string;
   bookTitle: string;
   peerName: string;
@@ -50,13 +62,6 @@ type InboxChat = InboxChatExchange | InboxChatWishlist;
 
 type Props = NativeStackScreenProps<RequestsStackParamList, 'ChatsInbox'>;
 
-type ActivePeer = {
-  key: string;
-  firstName: string;
-  avatarUrl?: string;
-  chat: InboxChat;
-};
-
 function truncateHint(s: string, max: number) {
   const t = s.trim();
   if (!t) return '';
@@ -68,37 +73,18 @@ function sortChatsDescending(a: InboxChat, b: InboxChat) {
   return new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime();
 }
 
-function firstNameOnly(name: string) {
-  const t = name.trim();
-  if (!t) return '?';
-  return t.split(/\s+/)[0] ?? t;
-}
-
-function buildActivePeers(chatsSorted: InboxChat[]): ActivePeer[] {
-  const seen = new Set<string>();
-  const list: ActivePeer[] = [];
-  for (const c of chatsSorted) {
-    const key = `${c.peerName.trim().toLowerCase()}|${c.peerAvatarUrl ?? ''}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    list.push({
-      key,
-      firstName: firstNameOnly(c.peerName),
-      avatarUrl: c.peerAvatarUrl,
-      chat: c,
-    });
-    if (list.length >= 24) break;
-  }
-  return list;
-}
-
 export function ChatsInboxScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { isSignedIn, userId } = useAuth();
   const [chats, setChats] = useState<InboxChat[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [exchangeTab, setExchangeTab] = useState<ExchangeInboxTab>('received');
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    setSearch('');
+  }, [exchangeTab]);
 
   const load = useCallback(async () => {
     if (!isSignedIn) return;
@@ -120,85 +106,77 @@ export function ChatsInboxScreen({ navigation }: Props) {
     }, [isSignedIn, load])
   );
 
-  const sortedChats = useMemo(() => [...chats].sort(sortChatsDescending), [chats]);
+  const sortedExchange = useMemo(
+    () =>
+      [...chats]
+        .filter((c): c is InboxChatExchange => c.kind === 'exchange')
+        .sort((a, b) => sortChatsDescending(a, b)),
+    [chats]
+  );
 
-  const filteredChats = useMemo(() => {
+  const exchangeForTab = useMemo(
+    () =>
+      sortedExchange.filter((c) => {
+        const role = c.exchangeRole ?? 'received';
+        return exchangeTab === 'sent' ? role === 'sent' : role === 'received';
+      }),
+    [sortedExchange, exchangeTab]
+  );
+
+  const filteredExchange = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return sortedChats;
-    return sortedChats.filter((c) => {
-      const blob =
-        c.kind === 'exchange'
-          ? `${c.peerName} ${c.preview} ${c.bookTitle}`
-          : `${c.peerName} ${c.preview} ${c.itemTitle}`;
-      return blob.toLowerCase().includes(q);
-    });
-  }, [sortedChats, search]);
+    if (!q) return exchangeForTab;
+    return exchangeForTab.filter((c) =>
+      `${c.peerName} ${c.preview} ${c.bookTitle}`.toLowerCase().includes(q)
+    );
+  }, [exchangeForTab, search]);
 
-  const activePeers = useMemo(() => buildActivePeers(filteredChats), [filteredChats]);
-
-  const openChat = useCallback(
-    (c: InboxChat) => {
-      if (c.kind === 'exchange') {
-        navigation.navigate('RequestChat', {
-          requestId: c.requestId,
-          bookTitle: c.bookTitle,
-          peerName: c.peerName,
-          peerAvatarUrl: c.peerAvatarUrl,
-        });
-        return;
-      }
-      navigation.getParent()?.navigate('Wishlist', {
-        screen: 'WishlistThreadChat',
-        params: {
-          threadId: c.threadId,
-          itemTitle: c.itemTitle,
-          peerName: c.peerName,
-          peerAvatarUrl: c.peerAvatarUrl,
-          returnToChatsInbox: true,
-        },
+  const openExchangeChat = useCallback(
+    (c: InboxChatExchange) => {
+      navigation.navigate('RequestChat', {
+        requestId: c.requestId,
+        bookTitle: c.bookTitle,
+        peerName: c.peerName,
+        peerAvatarUrl: c.peerAvatarUrl,
       });
     },
     [navigation]
   );
 
+  const headerGoBack = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate('RequestsHome');
+  }, [navigation]);
+
+  const topPad = Math.max(insets.top, 10);
+
   const headerRow = (
-    <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 10) }]}>
+    <View style={[styles.topBar, { paddingTop: topPad }]}>
       <Pressable
         style={styles.iconBtn}
-        onPress={() => navigation.navigate('RequestsHome')}
+        onPress={headerGoBack}
         hitSlop={10}
         accessibilityRole="button"
-        accessibilityLabel="Open exchange requests"
+        accessibilityLabel="Go back"
       >
-        <Ionicons name="menu-outline" size={28} color={lead} />
+        <Ionicons name="chevron-back" size={26} color={themeInk} />
       </Pressable>
+      <Text style={[styles.screenTitle, { fontFamily: font.bold }]} numberOfLines={1}>
+        Exchange · inbox
+      </Text>
       <Pressable
-        style={styles.bellWrap}
-        onPress={() => navigation.navigate('RequestsHome')}
+        style={styles.iconBtn}
+        onPress={() => void load()}
         hitSlop={10}
         accessibilityRole="button"
-        accessibilityLabel="Activity and offers"
+        accessibilityLabel="Refresh messages"
+        disabled={loading}
       >
-        <Ionicons name="notifications-outline" size={26} color={lead} />
-        {chats.length > 0 ? <View style={styles.bellDot} /> : null}
+        <Ionicons name="refresh" size={22} color={loading ? themeMuted : themeInk} />
       </Pressable>
-    </View>
-  );
-
-  const searchBar = (
-    <View style={styles.searchShell}>
-      <Ionicons name="search-outline" size={20} color={themeMuted} />
-      <TextInput
-        value={search}
-        onChangeText={setSearch}
-        placeholder="Search anything..."
-        placeholderTextColor={themeMuted}
-        style={styles.searchInput}
-        returnKeyType="search"
-        autoCorrect={false}
-        autoCapitalize="none"
-        clearButtonMode="while-editing"
-      />
     </View>
   );
 
@@ -210,11 +188,19 @@ export function ChatsInboxScreen({ navigation }: Props) {
           contentContainerStyle={[styles.signedOutScroll, { paddingBottom: insets.bottom + 24 }]}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={[styles.sectionHeading, styles.gateTitle]}>Exchange</Text>
-          <Text style={styles.gateSub}>Sign in to coordinate swaps with readers and listers.</Text>
+          <Pressable
+            style={styles.boardLink}
+            onPress={() => navigation.navigate('RequestsHome')}
+            accessibilityRole="button"
+          >
+            <Ionicons name="swap-horizontal-outline" size={18} color={themePrimary} />
+            <Text style={[styles.boardLinkTxt, styles.boardLinkTxtExchange, { fontFamily: font.semi }]}>
+              Open exchange requests
+            </Text>
+          </Pressable>
           <SignInGateCard
-            title="Sign in for exchange messages"
-            message="Connect with Google to open your exchange and wanted-book threads."
+            title="Sign in to see messages"
+            message="Sign in with Google to open swap threads here. Wanted-book chats are on the Wanted tab."
             icon="chatbubbles-outline"
           />
         </ScrollView>
@@ -222,104 +208,119 @@ export function ChatsInboxScreen({ navigation }: Props) {
     );
   }
 
-  if (loading) {
-    return (
-      <View style={styles.screen}>
-        {headerRow}
-        <View style={styles.searchPad}>{searchBar}</View>
-        <ActivityIndicator style={{ marginTop: 32 }} color={themeGreen} />
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.screen}>
-        {headerRow}
-        <View style={styles.searchPad}>{searchBar}</View>
-        <Text style={styles.error}>{error}</Text>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.screen}>
-      <FlatList
-        data={filteredChats}
-        keyExtractor={(c) => (c.kind === 'exchange' ? `e-${c.requestId}` : `w-${c.threadId}`)}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 100 }]}
-        renderItem={({ item: c }) => (
-          <ChatListRow
-            variant="inbox"
-            title={c.peerName}
-            preview={c.preview}
-            lastMessageSenderClerkUserId={c.lastMessageSenderClerkUserId}
-            peerNameForPrefix={c.peerName}
-            myUserId={userId}
-            dateIso={c.lastAt}
-            imageUrl={c.peerAvatarUrl}
-            fallbackLetter={c.peerName || '?'}
-            onPress={() => openChat(c)}
-            contextHint={
-              c.kind === 'exchange'
-                ? `${truncateHint(c.bookTitle, 36)} · Exchange`
-                : `${truncateHint(c.itemTitle, 36)} · Wanted`
-            }
+      {headerRow}
+      <View style={[styles.body, { paddingBottom: insets.bottom + 24 }]}>
+        <View style={styles.tabsRow}>
+          <Pressable
+            onPress={() => setExchangeTab('received')}
+            style={[styles.tabChip, exchangeTab === 'received' && styles.tabChipActive]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: exchangeTab === 'received' }}
+          >
+            <Text
+              style={[
+                styles.tabChipTxt,
+                { fontFamily: exchangeTab === 'received' ? font.semi : font.medium },
+                exchangeTab === 'received' && styles.tabChipTxtActive,
+              ]}
+            >
+              Received
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setExchangeTab('sent')}
+            style={[styles.tabChip, exchangeTab === 'sent' && styles.tabChipActive]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: exchangeTab === 'sent' }}
+          >
+            <Text
+              style={[
+                styles.tabChipTxt,
+                { fontFamily: exchangeTab === 'sent' ? font.semi : font.medium },
+                exchangeTab === 'sent' && styles.tabChipTxtActive,
+              ]}
+            >
+              Sent
+            </Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.searchShell}>
+          <Ionicons name="search-outline" size={20} color={themePrimary} style={{ opacity: 0.55 }} />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search by name or book..."
+            placeholderTextColor={themeMuted}
+            style={styles.searchInput}
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+            clearButtonMode="while-editing"
           />
-        )}
-        ListHeaderComponent={
-          <View>
-            {headerRow}
-            <View style={styles.searchPad}>{searchBar}</View>
-            {activePeers.length > 0 ? (
-              <>
-                <Text style={[styles.sectionHeading, styles.horizontalPad]}>Active</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.activeStrip}
-                >
-                  {activePeers.map((p) => (
-                    <Pressable key={p.key} style={styles.activeCell} onPress={() => openChat(p.chat)}>
-                      <View style={[styles.activeRing, { borderColor: themeNavMintBorder }]}>
-                        {p.avatarUrl ? (
-                          <Image source={{ uri: p.avatarUrl }} style={styles.activeAvatar} />
-                        ) : (
-                          <View style={[styles.activeAvatar, styles.activeAvatarPh]}>
-                            <Text style={styles.activeAvatarLetter}>{p.firstName.slice(0, 1).toUpperCase()}</Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text style={styles.activeName} numberOfLines={1}>
-                        {p.firstName}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              </>
-            ) : null}
-            <Text style={[styles.sectionHeading, styles.horizontalPad, styles.messageHeading]}>Message</Text>
-          </View>
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyWrap}>
-            {search.trim() ? (
-              <>
-                <Text style={styles.emptyTitle}>No results</Text>
-                <Text style={styles.emptySub}>Try another name or phrase.</Text>
-              </>
-            ) : (
-              <>
-                <Text style={styles.emptyTitle}>No conversations yet</Text>
-                <Text style={styles.emptySub}>
-                  Send an exchange request or message someone from the wanted books board.
+        </View>
+
+        <Pressable
+          style={styles.boardLinkRow}
+          onPress={() => navigation.navigate('RequestsHome')}
+          accessibilityRole="button"
+        >
+          <Ionicons name="swap-horizontal-outline" size={18} color={themePrimary} />
+          <Text style={[styles.boardLinkTxt, styles.boardLinkTxtExchange, { fontFamily: font.semi }]}>
+            Exchange books board
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={themePrimary} />
+        </Pressable>
+
+        {loading ? (
+          <ActivityIndicator style={{ marginTop: 28 }} color={themePrimary} />
+        ) : error ? (
+          <Text style={styles.error}>{error}</Text>
+        ) : (
+          <ScrollView
+            style={styles.listFlex}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator
+            keyboardShouldPersistTaps="handled"
+          >
+            {exchangeForTab.length === 0 ? (
+              <View style={styles.emptyWrap}>
+                <Text style={[styles.emptyBody, { fontFamily: font.regular }]}>
+                  {exchangeTab === 'sent'
+                    ? 'No threads yet for requests you sent. Browse listings and send an exchange offer to start a conversation.'
+                    : 'No chats from readers requesting your listings. When someone swaps on your books, conversations land here.'}
                 </Text>
-              </>
+              </View>
+            ) : filteredExchange.length === 0 ? (
+              <View style={styles.emptyWrap}>
+                <Text style={[styles.emptyTitle, { fontFamily: font.bold }]}>No results</Text>
+                <Text style={[styles.emptyBody, styles.emptySubtitle, { fontFamily: font.regular }]}>
+                  Try another name or book title.
+                </Text>
+              </View>
+            ) : (
+              filteredExchange.map((c) => (
+                <ChatListRow
+                  key={c.requestId}
+                  variant="inbox"
+                  title={c.peerName}
+                  preview={c.preview}
+                  lastMessageSenderClerkUserId={c.lastMessageSenderClerkUserId}
+                  peerNameForPrefix={c.peerName}
+                  myUserId={userId}
+                  dateIso={c.lastAt}
+                  imageUrl={c.peerAvatarUrl}
+                  fallbackLetter={c.peerName || '?'}
+                  onPress={() => openExchangeChat(c)}
+                  contextHint={truncateHint(c.bookTitle, 40)}
+                />
+              ))
             )}
-          </View>
-        }
-      />
+          </ScrollView>
+        )}
+      </View>
     </View>
   );
 }
@@ -327,146 +328,125 @@ export function ChatsInboxScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themePageBg,
   },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 4,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: themeInboxTopBorder,
   },
   iconBtn: {
-    padding: 4,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  bellWrap: {
-    padding: 4,
-    position: 'relative',
+  screenTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 18,
+    color: themeInk,
+    letterSpacing: -0.3,
   },
-  bellDot: {
-    position: 'absolute',
-    top: 4,
-    right: 5,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: themeGreen,
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-  },
-  searchPad: {
+  body: {
+    flex: 1,
     paddingHorizontal: 20,
-    marginTop: 10,
+    paddingTop: 14,
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+  },
+  tabChip: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    alignItems: 'center',
+    backgroundColor: themeInboxTabInactiveBg,
+  },
+  tabChipActive: {
+    backgroundColor: themeInboxTabActiveBg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: themePrimary,
+  },
+  tabChipTxt: {
+    fontSize: 14,
+    color: themeMuted,
+  },
+  tabChipTxtActive: {
+    color: themePrimary,
   },
   searchShell: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#F4F4F6',
+    backgroundColor: themeCard,
     borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: themeInboxSearchBorder,
     paddingHorizontal: 16,
     paddingVertical: 12,
+    marginBottom: 14,
   },
   searchInput: {
     flex: 1,
     fontSize: 15,
     fontFamily: font.regular,
-    color: lead,
+    color: themeInk,
     padding: 0,
   },
-  sectionHeading: {
-    fontSize: 18,
-    fontFamily: font.bold,
-    color: lead,
-    letterSpacing: -0.3,
-  },
-  horizontalPad: {
-    paddingHorizontal: 20,
-  },
-  messageHeading: {
-    marginTop: 22,
-    marginBottom: 6,
-  },
-  activeStrip: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 4,
-    gap: 16,
-  },
-  activeCell: {
+  boardLinkRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    width: 72,
+    gap: 8,
+    marginBottom: 14,
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    paddingHorizontal: 4,
   },
-  activeRing: {
-    padding: 2,
-    borderRadius: 999,
-    borderWidth: 2,
-  },
-  activeAvatar: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: '#E8E8EC',
-  },
-  activeAvatarPh: {
+  boardLink: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 16,
+    alignSelf: 'flex-start',
   },
-  activeAvatarLetter: {
-    fontSize: 22,
-    fontFamily: font.bold,
-    color: lead,
-  },
-  activeName: {
-    marginTop: 8,
-    fontSize: 13,
-    fontFamily: font.semi,
-    color: lead,
-    textAlign: 'center',
-    maxWidth: 72,
-  },
-  listContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-  },
-  emptyWrap: {
-    paddingHorizontal: 8,
-    paddingTop: 36,
-    alignItems: 'center',
-  },
-  emptyTitle: {
-    fontSize: 17,
-    fontFamily: font.bold,
-    color: lead,
-  },
-  emptySub: {
-    marginTop: 8,
+  boardLinkTxt: {
     fontSize: 14,
-    fontFamily: font.regular,
-    color: textSecondary,
-    textAlign: 'center',
-    lineHeight: 21,
-    maxWidth: 280,
   },
-  error: {
-    color: '#b3261e',
-    marginTop: 16,
-    paddingHorizontal: 20,
-    fontSize: 14,
-    fontFamily: font.regular,
+  boardLinkTxtExchange: {
+    color: themePrimary,
   },
   signedOutScroll: {
     paddingHorizontal: 20,
     paddingTop: 8,
   },
-  gateTitle: {
-    marginBottom: 6,
+  listFlex: { flex: 1 },
+  listContent: { paddingBottom: 40, flexGrow: 1 },
+  emptyWrap: {
+    paddingVertical: 28,
+    paddingHorizontal: 12,
   },
-  gateSub: {
-    fontSize: 14,
-    fontFamily: font.regular,
-    color: textSecondary,
+  emptyTitle: {
+    fontSize: 17,
+    color: themeInk,
+    textAlign: 'center',
     marginBottom: 8,
-    lineHeight: 20,
   },
+  emptySubtitle: {
+    marginTop: 0,
+  },
+  emptyBody: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: textSecondary,
+    textAlign: 'center',
+  },
+  error: { color: '#b3261e', marginTop: 16, fontSize: 14, fontFamily: font.regular },
 });

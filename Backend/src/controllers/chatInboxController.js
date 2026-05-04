@@ -64,10 +64,13 @@ export async function listChatsInbox(req, res, next) {
 
     const exchangeChats = requestRows.map((r) => {
       const imOwner = r.ownerClerkUserId === me;
+      /** You listed the book → someone reached out / received swap offer. Otherwise you requested someone else's listing. */
+      const exchangeRole = imOwner ? 'received' : 'sent';
       const peerId = imOwner ? r.requesterClerkUserId : r.ownerClerkUserId;
       const last = lastReqMsgById.get(String(r._id));
       return {
         kind: 'exchange',
+        exchangeRole,
         requestId: String(r._id),
         bookTitle: bookTitleById[String(r.bookId)] || 'Book',
         peerClerkUserId: peerId,

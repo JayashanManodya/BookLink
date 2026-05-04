@@ -15,3 +15,9 @@ export const themeMuted = '#8E8E8E';
 export const themeSearchGlass = 'rgba(255,255,255,0.22)';
 export const themeIconGlass = 'rgba(255,255,255,0.18)';
 export const themeIllustrationBlue = '#BDE0FE';
+
+/** Inbox chrome (lavender canvas, purple tab accent) — Exchange + Wanted */
+export const themeInboxTopBorder = 'rgba(113, 110, 255, 0.22)';
+export const themeInboxTabInactiveBg = 'rgba(16, 16, 17, 0.06)';
+export const themeInboxTabActiveBg = 'rgba(113, 110, 255, 0.14)';
+export const themeInboxSearchBorder = 'rgba(113, 110, 255, 0.28)';

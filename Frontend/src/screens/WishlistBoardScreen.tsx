@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
   type ImageStyle,
 } from 'react-native';
@@ -20,13 +23,15 @@ import { api, apiErrorMessage } from '../lib/api';
 import { SignInGateCard } from '../components/SignInGateCard';
 import { CourseScreenShell } from '../components/CourseScreenShell';
 import type { WishlistStackParamList } from '../navigation/wishlistStackTypes';
-import { cascadingWhite, dreamland, lead, textSecondary, themeSurfaceMuted } from '../theme/colors';
+import { cascadingWhite, chineseSilver, dreamland, lead, textSecondary, themeSurfaceMuted } from '../theme/colors';
 import {
   themeCard,
   themeGreen,
   themeIllustrationBlue,
   themeInk,
   themeMuted,
+  themeOrange,
+  themePageBg,
   themePrimary,
 } from '../theme/courseTheme';
 import { cardShadow } from '../theme/shadows';
@@ -58,6 +63,36 @@ function urgencyHeadline(u: WishlistItem['urgency']): string {
   return 'Low priority';
 }
 
+function createdAtMs(iso?: string): number {
+  if (!iso) return 0;
+  const n = new Date(iso).getTime();
+  return Number.isFinite(n) ? n : 0;
+}
+
+function urgencySortRank(u: WishlistItem['urgency']): number {
+  if (u === 'high') return 0;
+  if (u === 'medium') return 1;
+  return 2;
+}
+
+type CommunitySortKey = 'newest' | 'oldest' | 'priority' | 'title';
+
+type CommunityUrgencyFilter = 'all' | WishlistItem['urgency'];
+
+const URGENCY_CHIPS: [CommunityUrgencyFilter, string][] = [
+  ['all', 'All'],
+  ['high', 'High'],
+  ['medium', 'Medium'],
+  ['low', 'Low'],
+];
+
+const SORT_CHIPS: [CommunitySortKey, string][] = [
+  ['newest', 'Recent'],
+  ['oldest', 'Oldest'],
+  ['priority', 'Priority'],
+  ['title', 'Title A-Z'],
+];
+
 export function WishlistBoardScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const route = useRoute<RouteProp<WishlistStackParamList, 'WishlistBoard'>>();
@@ -69,10 +104,29 @@ export function WishlistBoardScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [communitySearch, setCommunitySearch] = useState('');
+  const [urgencyFilter, setUrgencyFilter] = useState<CommunityUrgencyFilter>('all');
+  const [subjectFilter, setSubjectFilter] = useState<string>('__all__');
+  const [sortKey, setSortKey] = useState<CommunitySortKey>('newest');
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
+  const [gradeFilter, setGradeFilter] = useState<string>('__all__');
+  const [languageFilterModal, setLanguageFilterModal] = useState('');
 
   useEffect(() => {
     if (route.params?.initialTab === 'mine') setScope('mine');
   }, [route.params?.initialTab]);
+
+  useEffect(() => {
+    if (scope === 'mine') {
+      setCommunitySearch('');
+      setUrgencyFilter('all');
+      setSubjectFilter('__all__');
+      setSortKey('newest');
+      setGradeFilter('__all__');
+      setLanguageFilterModal('');
+      setFilterModalOpen(false);
+    }
+  }, [scope]);
 
   const fetchWishlist = useCallback(
     async (variant: 'screen' | 'pull') => {
@@ -104,6 +158,98 @@ export function WishlistBoardScreen({ navigation }: Props) {
     }, [isSignedIn, fetchWishlist])
   );
 
+  const subjectChipOptions = useMemo(() => {
+    const uniq = new Set<string>();
+    for (const w of items) {
+      const s = w.subject?.trim();
+      if (s) uniq.add(s);
+    }
+    return [...uniq].sort((a, b) => a.localeCompare(b)).slice(0, 24);
+  }, [items]);
+
+  const gradeChipOptions = useMemo(() => {
+    const uniq = new Set<string>();
+    for (const w of items) {
+      const g = w.grade?.trim();
+      if (g) uniq.add(g);
+    }
+    return [...uniq].sort((a, b) => a.localeCompare(b)).slice(0, 20);
+  }, [items]);
+
+  const communityFilterActiveCount = useMemo(() => {
+    let n = 0;
+    if (urgencyFilter !== 'all') n += 1;
+    if (subjectFilter !== '__all__') n += 1;
+    if (sortKey !== 'newest') n += 1;
+    if (gradeFilter !== '__all__') n += 1;
+    if (languageFilterModal.trim()) n += 1;
+    return n;
+  }, [urgencyFilter, subjectFilter, sortKey, gradeFilter, languageFilterModal]);
+
+  const resetCommunityFiltersPanel = useCallback(() => {
+    setUrgencyFilter('all');
+    setSubjectFilter('__all__');
+    setSortKey('newest');
+    setGradeFilter('__all__');
+    setLanguageFilterModal('');
+  }, []);
+
+  const clearWishlistExplore = useCallback(() => {
+    setCommunitySearch('');
+    resetCommunityFiltersPanel();
+  }, [resetCommunityFiltersPanel]);
+
+  const visibleItems = useMemo(() => {
+    if (scope !== 'community') return items;
+
+    let list = [...items];
+    const q = communitySearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter((w) => {
+        const blob = `${w.title} ${w.author ?? ''} ${w.subject ?? ''} ${w.description ?? ''} ${w.language ?? ''} ${w.grade ?? ''} ${w.ownerDisplayName ?? ''}`.toLowerCase();
+        return blob.includes(q);
+      });
+    }
+    if (urgencyFilter !== 'all') {
+      list = list.filter((w) => w.urgency === urgencyFilter);
+    }
+    if (subjectFilter !== '__all__') {
+      list = list.filter((w) => (w.subject ?? '').trim() === subjectFilter);
+    }
+    const langQ = languageFilterModal.trim().toLowerCase();
+    if (langQ) {
+      list = list.filter((w) => (w.language ?? '').trim().toLowerCase().includes(langQ));
+    }
+    if (gradeFilter !== '__all__') {
+      list = list.filter((w) => (w.grade ?? '').trim() === gradeFilter);
+    }
+
+    if (sortKey === 'newest') {
+      list.sort((a, b) => createdAtMs(b.createdAt) - createdAtMs(a.createdAt));
+    } else if (sortKey === 'oldest') {
+      list.sort((a, b) => createdAtMs(a.createdAt) - createdAtMs(b.createdAt));
+    } else if (sortKey === 'priority') {
+      list.sort((a, b) => {
+        const dr = urgencySortRank(a.urgency) - urgencySortRank(b.urgency);
+        if (dr !== 0) return dr;
+        return createdAtMs(b.createdAt) - createdAtMs(a.createdAt);
+      });
+    } else {
+      list.sort((a, b) => (a.title || '').trim().localeCompare((b.title || '').trim(), undefined, { sensitivity: 'base' }));
+    }
+
+    return list;
+  }, [
+    scope,
+    items,
+    communitySearch,
+    urgencyFilter,
+    subjectFilter,
+    sortKey,
+    gradeFilter,
+    languageFilterModal,
+  ]);
+
   if (!isSignedIn) {
     return (
       <CourseScreenShell title="Wanted books" subtitle="Posts from readers looking for titles." scroll scrollContentStyle={{ gap: 16 }}>
@@ -116,34 +262,30 @@ export function WishlistBoardScreen({ navigation }: Props) {
     );
   }
 
-  const subtitle =
-    scope === 'community'
-      ? `Community board · ${items.length} ${items.length === 1 ? 'request' : 'requests'}`
-      : `Your posts · ${items.length} ${items.length === 1 ? 'item' : 'items'}`;
-
   return (
-    <CourseScreenShell
-      title={scope === 'community' ? 'Wanted books' : 'My wanted books'}
-      subtitle={subtitle}
-      scroll={false}
-      headerRight={
-        <View style={styles.headerActions}>
-          <Pressable style={styles.headerChatsBtn} onPress={() => navigation.navigate('WishlistChats')} hitSlop={6}>
-            <Ionicons name="chatbubbles-outline" size={18} color={cascadingWhite} />
-            <Text style={styles.headerChatsTxt}>Inbox</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => navigation.navigate('PostWanted')}
-            style={styles.headerAddBtn}
-            hitSlop={8}
-            accessibilityLabel="Post a wanted book"
-          >
-            <Ionicons name="add" size={26} color={cascadingWhite} />
-          </Pressable>
-        </View>
-      }
-    >
-      <View style={styles.signedInWrap}>
+    <>
+      <CourseScreenShell
+        title="Wanted books"
+        subtitle="Community requests and listings you manage."
+        scroll={false}
+        headerRight={
+          <View style={styles.headerActions}>
+            <Pressable style={styles.headerChatsBtn} onPress={() => navigation.navigate('WishlistChats')} hitSlop={6}>
+              <Ionicons name="chatbubbles-outline" size={18} color={cascadingWhite} />
+              <Text style={styles.headerChatsTxt}>Inbox</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => navigation.navigate('PostWanted')}
+              style={styles.headerAddBtn}
+              hitSlop={8}
+              accessibilityLabel="Post a wanted book"
+            >
+              <Ionicons name="add" size={26} color={cascadingWhite} />
+            </Pressable>
+          </View>
+        }
+      >
+        <View style={styles.signedInWrap}>
       <View style={styles.segment}>
         <Pressable
           onPress={() => setScope('community')}
@@ -159,14 +301,53 @@ export function WishlistBoardScreen({ navigation }: Props) {
         </Pressable>
       </View>
 
+      {scope === 'community' ? (
+        <View style={styles.communityExplore}>
+          <View style={styles.wantedSearchRow}>
+            <View style={styles.wantedSearchGlass}>
+              <Ionicons name="search-outline" size={20} color={themeMuted} />
+              <TextInput
+                style={[styles.wantedSearchInput, { fontFamily: font.medium }]}
+                value={communitySearch}
+                onChangeText={setCommunitySearch}
+                placeholder="Search anything..."
+                placeholderTextColor={themeMuted}
+                returnKeyType="search"
+                autoCorrect={false}
+                autoCapitalize="none"
+                selectionColor={themePrimary}
+              />
+            </View>
+            <Pressable
+              accessibilityLabel="Open filters"
+              onPress={() => setFilterModalOpen(true)}
+              hitSlop={6}
+              style={[styles.wantedFilterCircle, communityFilterActiveCount > 0 && styles.wantedFilterCircleOn]}
+            >
+              <Ionicons name="options-outline" size={20} color={themePrimary} />
+            </Pressable>
+          </View>
+          {communitySearch.trim().length > 0 || communityFilterActiveCount > 0 ? (
+            <Pressable onPress={clearWishlistExplore} style={styles.clearExploreRow}>
+              <Text style={[styles.clearExploreTxt, { fontFamily: font.bold }]}>Clear all filters</Text>
+              <Ionicons name="close-circle-outline" size={18} color={themePrimary} />
+            </Pressable>
+          ) : null}
+        </View>
+
+      ) : null}
+
       {loading && !refreshing ? (
         <ActivityIndicator style={{ marginTop: 24 }} color={themePrimary} />
       ) : error ? (
         <Text style={styles.error}>{error}</Text>
       ) : (
         <ScrollView
-          contentContainerStyle={styles.list}
+          style={styles.listScroll}
+          contentContainerStyle={[styles.list, scope === 'community' && styles.listAfterExplore]}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -183,8 +364,12 @@ export function WishlistBoardScreen({ navigation }: Props) {
                   : 'You have not posted any wanted books yet. Tap below to add one.'}
               </Text>
             </View>
+          ) : visibleItems.length === 0 ? (
+            <View style={[styles.card, cardShadow]}>
+              <Text style={styles.body}>No posts match your search or filters. Try widening your search.</Text>
+            </View>
           ) : (
-            items.map((w) => {
+            visibleItems.map((w) => {
               const tagLine = [w.author?.trim(), w.subject?.trim()].filter(Boolean).join(' · ') || 'Book request';
               const listed = relativeListingAge(w.createdAt);
               const tailLabel =
@@ -252,19 +437,199 @@ export function WishlistBoardScreen({ navigation }: Props) {
           )}
         </ScrollView>
       )}
-      <Pressable
-        style={[styles.fabSecondary, cardShadow, { bottom: Math.max(insets.bottom, 12) + 16 }]}
-        onPress={() => navigation.navigate('WishlistMatches')}
-      >
-        <Text style={styles.fabSecondaryText}>See matches with listings</Text>
-      </Pressable>
       </View>
-    </CourseScreenShell>
+      </CourseScreenShell>
+
+      <Modal
+        visible={filterModalOpen && scope === 'community'}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setFilterModalOpen(false)}
+      >
+        <View style={styles.wModalRoot}>
+          <Pressable style={styles.wModalBackdrop} onPress={() => setFilterModalOpen(false)} />
+          <View style={[styles.wModalSheet, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+            <View style={styles.wModalHandle} />
+            <View style={styles.wModalHeader}>
+              <Text style={[styles.wModalTitle, { fontFamily: font.extraBold }]}>Filters</Text>
+              <Pressable onPress={() => setFilterModalOpen(false)} hitSlop={12}>
+                <Ionicons name="close" size={26} color={themeInk} />
+              </Pressable>
+            </View>
+            <Text style={[styles.wModalHint, { fontFamily: font.regular }]}>
+              Combine with search. Mirrors the filters sheet on Home.
+            </Text>
+
+            <ScrollView style={styles.wModalScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              <Text style={[styles.wAdvLabel, { fontFamily: font.semi }]}>Urgency</Text>
+              <View style={styles.wChipWrap}>
+                {URGENCY_CHIPS.map(([value, label]) => (
+                  <Pressable
+                    key={value}
+                    onPress={() => setUrgencyFilter(value)}
+                    style={[styles.wAdvChip, urgencyFilter === value && styles.wAdvChipOn]}
+                  >
+                    <Text
+                      style={[
+                        styles.wAdvChipTxt,
+                        urgencyFilter === value && styles.wAdvChipTxtOn,
+                        { fontFamily: font.medium },
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              {subjectChipOptions.length > 0 ? (
+                <>
+                  <Text style={[styles.wAdvLabel, { fontFamily: font.semi }]}>Subject / topic</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.wAdvHScroll}
+                    contentContainerStyle={styles.wAdvHScrollContent}
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    <Pressable
+                      onPress={() => setSubjectFilter('__all__')}
+                      style={[styles.wAdvChip, subjectFilter === '__all__' && styles.wAdvChipOn]}
+                    >
+                      <Text
+                        style={[
+                          styles.wAdvChipTxt,
+                          subjectFilter === '__all__' && styles.wAdvChipTxtOn,
+                          { fontFamily: font.medium },
+                        ]}
+                      >
+                        Any
+                      </Text>
+                    </Pressable>
+                    {subjectChipOptions.map((subj) => (
+                      <Pressable
+                        key={subj}
+                        onPress={() => setSubjectFilter(subj)}
+                        style={[styles.wAdvChip, subjectFilter === subj && styles.wAdvChipOn]}
+                      >
+                        <Text
+                          style={[
+                            styles.wAdvChipTxt,
+                            subjectFilter === subj && styles.wAdvChipTxtOn,
+                            { fontFamily: font.medium },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {subj}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </>
+              ) : null}
+
+              <Text style={[styles.wAdvLabel, { fontFamily: font.semi }]}>Sort by</Text>
+              <View style={styles.wChipWrap}>
+                {SORT_CHIPS.map(([value, label]) => (
+                  <Pressable
+                    key={value}
+                    onPress={() => setSortKey(value)}
+                    style={[styles.wAdvChip, sortKey === value && styles.wAdvChipOn]}
+                  >
+                    <Text
+                      style={[
+                        styles.wAdvChipTxt,
+                        sortKey === value && styles.wAdvChipTxtOn,
+                        { fontFamily: font.medium },
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              {gradeChipOptions.length > 0 ? (
+                <>
+                  <Text style={[styles.wAdvLabel, { fontFamily: font.semi }]}>Grade</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.wAdvHScroll}
+                    contentContainerStyle={styles.wAdvHScrollContent}
+                  >
+                    <Pressable
+                      onPress={() => setGradeFilter('__all__')}
+                      style={[styles.wAdvChip, gradeFilter === '__all__' && styles.wAdvChipOn]}
+                    >
+                      <Text
+                        style={[
+                          styles.wAdvChipTxt,
+                          gradeFilter === '__all__' && styles.wAdvChipTxtOn,
+                          { fontFamily: font.medium },
+                        ]}
+                      >
+                        Any
+                      </Text>
+                    </Pressable>
+                    {gradeChipOptions.map((g) => (
+                      <Pressable
+                        key={g}
+                        onPress={() => setGradeFilter(g)}
+                        style={[styles.wAdvChip, gradeFilter === g && styles.wAdvChipOn]}
+                      >
+                        <Text
+                          style={[
+                            styles.wAdvChipTxt,
+                            gradeFilter === g && styles.wAdvChipTxtOn,
+                            { fontFamily: font.medium },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {g}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </>
+              ) : null}
+
+              <Text style={[styles.wAdvLabel, { fontFamily: font.semi }]}>Language</Text>
+              <TextInput
+                style={[styles.wAdvInput, { fontFamily: font.regular }]}
+                placeholder="e.g. English, Sinhala"
+                placeholderTextColor={themeMuted}
+                value={languageFilterModal}
+                onChangeText={setLanguageFilterModal}
+              />
+            </ScrollView>
+
+            <View style={styles.wModalActions}>
+              <Pressable
+                style={[styles.wModalBtn, styles.wModalBtnGhost]}
+                onPress={() => {
+                  resetCommunityFiltersPanel();
+                }}
+              >
+                <Text style={[styles.wModalBtnGhostTxt, { fontFamily: font.bold }]}>Reset panel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.wModalBtn, styles.wModalBtnPrimary]}
+                onPress={() => setFilterModalOpen(false)}
+              >
+                <Text style={[styles.wModalBtnPrimaryTxt, { fontFamily: font.bold }]}>Apply</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   signedInWrap: { flex: 1, position: 'relative' },
+  listScroll: { flex: 1, minHeight: 0 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerChatsBtn: {
     flexDirection: 'row',
@@ -307,7 +672,182 @@ const styles = StyleSheet.create({
   segmentBtnOn: { backgroundColor: themePrimary },
   segmentTxt: { fontSize: 14, fontWeight: '700', color: textSecondary },
   segmentTxtOn: { color: cascadingWhite },
-  list: { paddingBottom: 110, gap: 12, marginTop: 16 },
+  communityExplore: {
+    paddingTop: 8,
+    paddingBottom: 4,
+    gap: 0,
+  },
+  wantedSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 8,
+  },
+  wantedSearchGlass: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: themeCard,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: Platform.select({ ios: 11, default: 9 }),
+    gap: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+  },
+  wantedSearchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: lead,
+    paddingVertical: 0,
+  },
+  wantedFilterCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: cascadingWhite,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#101011',
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+  },
+  wantedFilterCircleOn: {
+    borderWidth: 2,
+    borderColor: themeOrange,
+  },
+  clearExploreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    marginBottom: 8,
+  },
+  clearExploreTxt: { fontSize: 14, color: themePrimary },
+  listAfterExplore: {
+    marginTop: 6,
+  },
+  wModalRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  wModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(16,16,17,0.45)',
+  },
+  wModalSheet: {
+    backgroundColor: cascadingWhite,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    maxHeight: '88%',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: chineseSilver,
+  },
+  wModalHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: chineseSilver,
+    marginBottom: 14,
+  },
+  wModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  wModalTitle: { fontSize: 20, color: themeInk },
+  wModalHint: { fontSize: 14, color: themeMuted, lineHeight: 20, marginBottom: 16 },
+  wModalScroll: { maxHeight: 400 },
+  wAdvLabel: {
+    fontSize: 13,
+    color: themeMuted,
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  wChipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  wAdvChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dreamland,
+    backgroundColor: themeCard,
+    maxWidth: 220,
+  },
+  wAdvChipOn: {
+    backgroundColor: 'rgba(113,110,255,0.12)',
+    borderColor: themePrimary,
+  },
+  wAdvChipTxt: { fontSize: 14, color: themeMuted },
+  wAdvChipTxtOn: { color: themePrimary },
+  wAdvHScroll: {
+    marginHorizontal: -20,
+    marginBottom: 14,
+  },
+  wAdvHScrollContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 4,
+  },
+  wAdvInput: {
+    backgroundColor: themePageBg,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: chineseSilver,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: themeInk,
+    marginBottom: 14,
+  },
+  wModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: chineseSilver,
+  },
+  wModalBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 18,
+    alignItems: 'center',
+  },
+  wModalBtnGhost: {
+    backgroundColor: cascadingWhite,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: chineseSilver,
+  },
+  wModalBtnGhostTxt: { fontSize: 16, color: themeMuted },
+  wModalBtnPrimary: {
+    backgroundColor: themePrimary,
+    shadowColor: themePrimary,
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  wModalBtnPrimaryTxt: {
+    fontSize: 16,
+    color: cascadingWhite,
+  },
+  list: {
+    paddingBottom: 36,
+    gap: 12,
+    marginTop: 16,
+  },
   card: {
     backgroundColor: cascadingWhite,
     borderRadius: 24,
@@ -407,16 +947,4 @@ const styles = StyleSheet.create({
     color: themeMuted,
     textAlign: 'right',
   },
-  fabSecondary: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
-    backgroundColor: cascadingWhite,
-    borderRadius: 20,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-  },
-  fabSecondaryText: { fontSize: 15, fontWeight: '800', color: lead },
 });

@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -136,12 +137,14 @@ export function WantedBookDetailScreen({ navigation, route }: Props) {
 
   if (loading) {
     return (
-      <View style={[styles.flex, { paddingTop: Math.max(insets.top, 8) }]}>
-        <View style={styles.topBar}>
+      <View style={styles.flex}>
+        <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 8) }]}>
           <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={24} color={lead} />
             <Text style={styles.backText}>Back</Text>
           </Pressable>
+          <Text style={styles.screenTitle}>Wanted book</Text>
+          <View style={{ width: 72 }} />
         </View>
         <ActivityIndicator style={{ marginTop: 40 }} color={themePrimary} />
       </View>
@@ -150,12 +153,14 @@ export function WantedBookDetailScreen({ navigation, route }: Props) {
 
   if (error || !item) {
     return (
-      <View style={[styles.flex, { paddingTop: Math.max(insets.top, 8) }]}>
-        <View style={styles.topBar}>
+      <View style={styles.flex}>
+        <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 8) }]}>
           <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={24} color={lead} />
             <Text style={styles.backText}>Back</Text>
           </Pressable>
+          <Text style={styles.screenTitle}>Wanted book</Text>
+          <View style={{ width: 72 }} />
         </View>
         <Text style={styles.error}>{error || 'Not found'}</Text>
       </View>
@@ -167,7 +172,9 @@ export function WantedBookDetailScreen({ navigation, route }: Props) {
 
   return (
     <View style={styles.flex}>
-      <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 8) }]}>
+      <View
+        style={[styles.topBar, { paddingTop: Math.max(insets.top, 8) }]}
+      >
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={lead} />
           <Text style={styles.backText}>Back</Text>
@@ -175,7 +182,11 @@ export function WantedBookDetailScreen({ navigation, route }: Props) {
         <Text style={styles.screenTitle}>Wanted book</Text>
         <View style={{ width: 72 }} />
       </View>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
         {item.wantedBookPhoto ? (
           <Image source={{ uri: item.wantedBookPhoto }} style={styles.photo} resizeMode="cover" />
         ) : null}
@@ -284,10 +295,22 @@ function urgencyStyle(u: WishlistItem['urgency']) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: themePageBg },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingBottom: 8 },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+    backgroundColor: themePageBg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: dreamland,
+    zIndex: 2,
+    ...Platform.select({ android: { elevation: 2 }, default: {} }),
+  },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, width: 88 },
   backText: { fontSize: 15, fontWeight: '600', color: lead },
   screenTitle: { fontSize: 17, fontWeight: '800', color: lead },
+  scrollView: { flex: 1, minHeight: 0 },
   scroll: { paddingHorizontal: 20, paddingBottom: 40, gap: 14 },
   photo: { width: '100%', height: 200, borderRadius: 16, backgroundColor: '#eee' },
   title: { fontSize: 24, fontWeight: '800', color: lead, letterSpacing: -0.3 },

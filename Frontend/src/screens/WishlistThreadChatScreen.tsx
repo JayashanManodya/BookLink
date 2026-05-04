@@ -279,7 +279,7 @@ export function WishlistThreadChatScreen({ navigation, route }: Props) {
 
   const leaveChat = useCallback(() => {
     if (returnToChatsInbox) {
-      navigation.getParent()?.navigate('Requests', { screen: 'ChatsInbox' });
+      navigation.getParent()?.navigate('Wishlist', { screen: 'WishlistChats' });
       return;
     }
     navigation.dispatch(

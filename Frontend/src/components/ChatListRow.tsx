@@ -1,5 +1,5 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { cascadingWhite, chineseSilver, lead, textSecondary, warmHaze } from '../theme/colors';
+import { cascadingWhite, chineseSilver, lead, textSecondary, themeInk, themeMuted, themePrimary, themePageBg, warmHaze } from '../theme/colors';
 
 function firstNameFromDisplay(name: string) {
   const t = name.trim();
@@ -98,8 +98,15 @@ export function ChatListRow({
       {imageUrl ? (
         <Image source={{ uri: imageUrl }} style={[styles.avatar, variant === 'inbox' && styles.avatarInbox]} />
       ) : (
-        <View style={[styles.avatar, styles.avatarPh, variant === 'inbox' && styles.avatarInbox]}>
-          <Text style={styles.avatarLetter}>{fallbackLetter.slice(0, 1).toUpperCase()}</Text>
+        <View
+          style={[
+            styles.avatar,
+            styles.avatarPh,
+            variant === 'inbox' && styles.avatarInbox,
+            variant === 'inbox' && styles.avatarPhInbox,
+          ]}
+        >
+          <Text style={[styles.avatarLetter, variant === 'inbox' && styles.avatarLetterInbox]}>{fallbackLetter.slice(0, 1).toUpperCase()}</Text>
         </View>
       )}
       <View style={styles.body}>
@@ -137,12 +144,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: chineseSilver,
   },
+  /** Flat list row — same bg as inbox screen (no white “card” slab) */
   rowInbox: {
     gap: 12,
     paddingVertical: 14,
     paddingHorizontal: 0,
-    backgroundColor: '#FFFFFF',
-    borderBottomColor: '#ECECEC',
+    backgroundColor: themePageBg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: chineseSilver,
   },
   avatar: {
     width: 54,
@@ -156,7 +165,13 @@ const styles = StyleSheet.create({
     borderRadius: 26,
   },
   avatarPh: { alignItems: 'center', justifyContent: 'center' },
+  avatarPhInbox: {
+    backgroundColor: 'rgba(113, 110, 255, 0.12)',
+  },
   avatarLetter: { fontSize: 20, fontWeight: '700', color: lead },
+  avatarLetterInbox: {
+    color: themePrimary,
+  },
   body: { flex: 1, minWidth: 0 },
   titleRow: {
     flexDirection: 'row',
@@ -174,6 +189,7 @@ const styles = StyleSheet.create({
   titleInbox: {
     fontSize: 16,
     fontWeight: '700',
+    color: themeInk,
   },
   date: {
     fontSize: 13,
@@ -183,7 +199,7 @@ const styles = StyleSheet.create({
   },
   dateInbox: {
     fontSize: 12,
-    color: '#A0A0A0',
+    color: themeMuted,
     marginTop: 0,
     fontVariant: ['tabular-nums'],
   },
@@ -198,7 +214,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
     fontSize: 14,
     lineHeight: 19,
-    color: '#8E8E8E',
+    color: themeMuted,
   },
   previewStrong: {
     fontSize: 15,
@@ -212,10 +228,11 @@ const styles = StyleSheet.create({
   },
   previewStrongInbox: {
     fontSize: 14,
-    color: '#8E8E8E',
+    fontWeight: '700',
+    color: textSecondary,
   },
   previewHintInbox: {
     fontSize: 14,
-    color: '#B0B0B0',
+    color: themeMuted,
   },
 });

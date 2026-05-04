@@ -3,7 +3,6 @@ import { PostWantedBookScreen } from '../screens/PostWantedBookScreen';
 import { WantedBookDetailScreen } from '../screens/WantedBookDetailScreen';
 import { WishlistBoardScreen } from '../screens/WishlistBoardScreen';
 import { WishlistChatsScreen } from '../screens/WishlistChatsScreen';
-import { WishlistMatchesScreen } from '../screens/WishlistMatchesScreen';
 import { WishlistThreadChatScreen } from '../screens/WishlistThreadChatScreen';
 import type { WishlistStackParamList } from './wishlistStackTypes';
 
@@ -20,7 +19,6 @@ export function WishlistStack() {
       <Stack.Screen name="WishlistBoard" component={WishlistBoardScreen} />
       <Stack.Screen name="WishlistChats" component={WishlistChatsScreen} />
       <Stack.Screen name="PostWanted" component={PostWantedBookScreen} />
-      <Stack.Screen name="WishlistMatches" component={WishlistMatchesScreen} />
       <Stack.Screen name="WantedBookDetail" component={WantedBookDetailScreen} />
       <Stack.Screen name="WishlistThreadChat" component={WishlistThreadChatScreen} />
     </Stack.Navigator>

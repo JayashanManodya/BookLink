@@ -1,10 +1,11 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -16,8 +17,18 @@ import { api, apiErrorMessage } from '../lib/api';
 import { SignInGateCard } from '../components/SignInGateCard';
 import { ChatListRow } from '../components/ChatListRow';
 import type { WishlistStackParamList } from '../navigation/wishlistStackTypes';
-import { themeGreen, themeMuted, themeNavMint, themeNavMintBorder } from '../theme/courseTheme';
-import { lead, textSecondary } from '../theme/colors';
+import {
+  themeCard,
+  themeInboxSearchBorder,
+  themeInboxTabActiveBg,
+  themeInboxTabInactiveBg,
+  themeInboxTopBorder,
+  themeMuted,
+  themePageBg,
+  themePrimary,
+  themeInk,
+} from '../theme/courseTheme';
+import { textSecondary } from '../theme/colors';
 import { font } from '../theme/typography';
 
 type TabKey = 'poster' | 'helper';
@@ -46,8 +57,13 @@ export function WishlistChatsScreen({ navigation }: Props) {
   const { isSignedIn, userId } = useAuth();
   const [tab, setTab] = useState<TabKey>('poster');
   const [chats, setChats] = useState<WishlistChatRow[]>([]);
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSearch('');
+  }, [tab]);
 
   const load = useCallback(async () => {
     if (!isSignedIn) return;
@@ -71,6 +87,14 @@ export function WishlistChatsScreen({ navigation }: Props) {
     }, [isSignedIn, load])
   );
 
+  const filteredChats = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return chats;
+    return chats.filter((c) =>
+      `${c.peerName} ${c.preview} ${c.itemTitle}`.toLowerCase().includes(q)
+    );
+  }, [chats, search]);
+
   const openThread = (c: WishlistChatRow) => {
     navigation.navigate('WishlistThreadChat', {
       threadId: c.threadId,
@@ -91,7 +115,7 @@ export function WishlistChatsScreen({ navigation }: Props) {
         accessibilityRole="button"
         accessibilityLabel="Go back"
       >
-        <Ionicons name="chevron-back" size={26} color={lead} />
+        <Ionicons name="chevron-back" size={26} color={themeInk} />
       </Pressable>
       <Text style={[styles.screenTitle, { fontFamily: font.bold }]} numberOfLines={1}>
         Wanted books · inbox
@@ -104,7 +128,7 @@ export function WishlistChatsScreen({ navigation }: Props) {
         accessibilityLabel="Refresh messages"
         disabled={loading}
       >
-        <Ionicons name="refresh" size={22} color={loading ? themeMuted : lead} />
+        <Ionicons name="refresh" size={22} color={loading ? themeMuted : themeInk} />
       </Pressable>
     </View>
   );
@@ -122,7 +146,7 @@ export function WishlistChatsScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('WishlistBoard')}
             accessibilityRole="button"
           >
-            <Ionicons name="book-outline" size={18} color={themeGreen} />
+            <Ionicons name="book-outline" size={18} color={themePrimary} />
             <Text style={[styles.boardLinkTxt, { fontFamily: font.semi }]}>Open wanted books board</Text>
           </Pressable>
           <SignInGateCard
@@ -174,18 +198,33 @@ export function WishlistChatsScreen({ navigation }: Props) {
           </Pressable>
         </View>
 
+        <View style={styles.searchShell}>
+          <Ionicons name="search-outline" size={20} color={themePrimary} style={{ opacity: 0.55 }} />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search by name or book..."
+            placeholderTextColor={themeMuted}
+            style={styles.searchInput}
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+            clearButtonMode="while-editing"
+          />
+        </View>
+
         <Pressable
           style={styles.boardLinkRow}
           onPress={() => navigation.navigate('WishlistBoard')}
           accessibilityRole="button"
         >
-          <Ionicons name="book-outline" size={18} color={themeGreen} />
+          <Ionicons name="book-outline" size={18} color={themePrimary} />
           <Text style={[styles.boardLinkTxt, { fontFamily: font.semi }]}>Wanted books board</Text>
-          <Ionicons name="chevron-forward" size={16} color={themeMuted} />
+          <Ionicons name="chevron-forward" size={16} color={themePrimary} />
         </Pressable>
 
         {loading ? (
-          <ActivityIndicator style={{ marginTop: 28 }} color={themeGreen} />
+          <ActivityIndicator style={{ marginTop: 28 }} color={themePrimary} />
         ) : error ? (
           <Text style={styles.error}>{error}</Text>
         ) : (
@@ -202,8 +241,15 @@ export function WishlistChatsScreen({ navigation }: Props) {
                     : 'No threads yet where you offered a book. Open a wanted post and tap to send a message.'}
                 </Text>
               </View>
+            ) : filteredChats.length === 0 ? (
+              <View style={styles.emptyWrap}>
+                <Text style={[styles.emptyTitle, { fontFamily: font.bold }]}>No results</Text>
+                <Text style={[styles.emptyBody, styles.emptySubtitle, { fontFamily: font.regular }]}>
+                  Try another name or book title.
+                </Text>
+              </View>
             ) : (
-              chats.map((c) => (
+              filteredChats.map((c) => (
                 <ChatListRow
                   key={c.threadId}
                   variant="inbox"
@@ -230,7 +276,7 @@ export function WishlistChatsScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: themePageBg,
   },
   topBar: {
     flexDirection: 'row',
@@ -239,7 +285,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingBottom: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#ECECEC',
+    borderBottomColor: themeInboxTopBorder,
   },
   iconBtn: {
     width: 44,
@@ -251,7 +297,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     fontSize: 18,
-    color: lead,
+    color: themeInk,
     letterSpacing: -0.3,
   },
   body: {
@@ -270,19 +316,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 999,
     alignItems: 'center',
-    backgroundColor: '#F4F4F6',
+    backgroundColor: themeInboxTabInactiveBg,
   },
   tabChipActive: {
-    backgroundColor: themeNavMint,
+    backgroundColor: themeInboxTabActiveBg,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: themeNavMintBorder,
+    borderColor: themePrimary,
   },
   tabChipTxt: {
     fontSize: 14,
     color: themeMuted,
   },
   tabChipTxtActive: {
-    color: themeGreen,
+    color: themePrimary,
+  },
+  searchShell: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: themeCard,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: themeInboxSearchBorder,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 14,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: font.regular,
+    color: themeInk,
+    padding: 0,
   },
   boardLinkRow: {
     flexDirection: 'row',
@@ -302,7 +367,7 @@ const styles = StyleSheet.create({
   },
   boardLinkTxt: {
     fontSize: 14,
-    color: themeGreen,
+    color: themePrimary,
   },
   signedOutScroll: {
     paddingHorizontal: 20,
@@ -313,6 +378,15 @@ const styles = StyleSheet.create({
   emptyWrap: {
     paddingVertical: 28,
     paddingHorizontal: 12,
+  },
+  emptyTitle: {
+    fontSize: 17,
+    color: themeInk,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    marginTop: 0,
   },
   emptyBody: {
     fontSize: 15,

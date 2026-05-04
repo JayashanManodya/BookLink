@@ -4,7 +4,7 @@ import {
   Animated,
   Dimensions,
   Image,
-  Modal,
+  Keyboard,
   Platform,
   Pressable,
   ScrollView,
@@ -20,11 +20,10 @@ import { useAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../lib/api';
-import type { BrowseStackParamList } from '../navigation/browseStackTypes';
+import { browseAllBooksParamsFromUi, type BrowseStackParamList } from '../navigation/browseStackTypes';
 import {
   cascadingWhite,
   chineseSilver,
-  dreamland,
 } from '../theme/colors';
 import {
   themeCard,
@@ -40,6 +39,7 @@ import { cardShadow } from '../theme/shadows';
 import { font, fontHandwriting } from '../theme/typography';
 import type { Book } from '../types/book';
 import type { WishlistItem } from '../types/wishlist';
+import { BrowseBooksFilterModal, BROWSE_CONDITIONS } from '../components/BrowseBooksFilterModal';
 import { BOOK_TYPES } from '../constants/bookTypes';
 
 const WANTED_SECTION_LIMIT = 12;
@@ -53,8 +53,6 @@ const HERO_BOTTOM_RADIUS = 44;
 const FEATURE_OVERLAP_UP = 46;
 /** Extra vertical space between the search row and the top of the Latest card (positive = more gap). */
 const GAP_SEARCH_TO_FEATURE_CARD = 18;
-
-const CONDITIONS = ['new', 'good', 'poor'] as const;
 
 const SEARCH_DEBOUNCE_MS = 380;
 
@@ -124,7 +122,7 @@ export function BrowseListScreen({ navigation }: Props) {
   const [bookTypeChip, setBookTypeChip] = useState<string | null>(null);
 
   const [advModalOpen, setAdvModalOpen] = useState(false);
-  const [advCondition, setAdvCondition] = useState<(typeof CONDITIONS)[number] | null>(null);
+  const [advCondition, setAdvCondition] = useState<(typeof BROWSE_CONDITIONS)[number] | null>(null);
   const [advLanguage, setAdvLanguage] = useState('');
   const [advYearMin, setAdvYearMin] = useState('');
   const [advYearMax, setAdvYearMax] = useState('');
@@ -251,6 +249,27 @@ export function BrowseListScreen({ navigation }: Props) {
     setSearchInput('');
     clearAdvanced();
   };
+
+  const openBrowseAllBooks = useCallback(() => {
+    navigation.navigate(
+      'BrowseAllBooks',
+      browseAllBooksParamsFromUi({
+        searchInput,
+        bookTypeChip,
+        advCondition,
+        advLanguage,
+        advYearMin,
+        advYearMax,
+      })
+    );
+  }, [navigation, searchInput, bookTypeChip, advCondition, advLanguage, advYearMin, advYearMax]);
+
+  const submitSearchGoToBrowseAll = useCallback(() => {
+    const q = searchInput.trim();
+    if (!q) return;
+    Keyboard.dismiss();
+    openBrowseAllBooks();
+  }, [searchInput, openBrowseAllBooks]);
 
   const hasAnyFilter = !!debouncedSearch || advancedActiveCount > 0;
 
@@ -467,6 +486,8 @@ export function BrowseListScreen({ navigation }: Props) {
                   value={searchInput}
                   onChangeText={setSearchInput}
                   returnKeyType="search"
+                  onSubmitEditing={submitSearchGoToBrowseAll}
+                  blurOnSubmit={Platform.OS !== 'android'}
                   selectionColor={cascadingWhite}
                 />
               </View>
@@ -567,7 +588,7 @@ export function BrowseListScreen({ navigation }: Props) {
 
           <View style={styles.sectionHeaderRow}>
             <Text style={[styles.sectionMainTitle, { fontFamily: font.bold }]}>Popular books</Text>
-            <Pressable onPress={() => void load()} hitSlop={8}>
+            <Pressable onPress={openBrowseAllBooks} hitSlop={8}>
               <Text style={[styles.viewAllTxt, { fontFamily: font.semi }]}>See all</Text>
             </Pressable>
           </View>
@@ -653,11 +674,11 @@ export function BrowseListScreen({ navigation }: Props) {
               <View style={styles.sectionHeaderRow}>
                 <Text style={[styles.sectionMainTitle, { fontFamily: font.bold }]}>Wanted books</Text>
                 <Pressable onPress={openWantedBoard} hitSlop={8}>
-                  <Text style={[styles.viewAllTxt, { fontFamily: font.semi }]}>Board</Text>
+                  <Text style={[styles.viewAllTxt, { fontFamily: font.semi }]}>See all</Text>
                 </Pressable>
               </View>
               <Text style={[styles.wantedSub, { fontFamily: font.regular }]}>
-                Readers looking for titles — tap a card to offer help.
+                Readers looking for titles - tap a card to offer help.
               </Text>
               {wantedLoading && wantedItems.length === 0 ? (
                 <ActivityIndicator style={{ marginVertical: 14 }} color={themeGreen} />
@@ -740,133 +761,21 @@ export function BrowseListScreen({ navigation }: Props) {
         </View>
       </ScrollView>
 
-      <Modal
+      <BrowseBooksFilterModal
         visible={advModalOpen}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setAdvModalOpen(false)}
-      >
-        <View style={styles.modalRoot}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setAdvModalOpen(false)} />
-          <View style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 20) }]}>
-            <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { fontFamily: font.extraBold }]}>Advanced filters</Text>
-              <Pressable onPress={() => setAdvModalOpen(false)} hitSlop={12}>
-                <Ionicons name="close" size={26} color={themeInk} />
-              </Pressable>
-            </View>
-            <Text style={[styles.modalHint, { fontFamily: font.regular }]}>
-              Combine with the search bar. Book type mirrors the category chips under Popular books.
-            </Text>
-
-            <ScrollView
-              style={styles.modalScroll}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              <Text style={[styles.advLabel, { fontFamily: font.semi }]}>Book type</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                style={styles.advBookTypeScroll}
-                contentContainerStyle={styles.advBookTypeScrollContent}
-              >
-                <Pressable
-                  onPress={() => setBookTypeChip(null)}
-                  style={[styles.advChip, !bookTypeChip && styles.advChipOn]}
-                >
-                  <Text
-                    style={[styles.advChipTxt, !bookTypeChip && styles.advChipTxtOn, { fontFamily: font.medium }]}
-                  >
-                    Any
-                  </Text>
-                </Pressable>
-                {BOOK_TYPES.map((tab) => (
-                  <Pressable
-                    key={tab}
-                    onPress={() => setBookTypeChip((prev) => (prev === tab ? null : tab))}
-                    style={[styles.advChip, bookTypeChip === tab && styles.advChipOn]}
-                  >
-                    <Text
-                      style={[styles.advChipTxt, bookTypeChip === tab && styles.advChipTxtOn, { fontFamily: font.medium }]}
-                    >
-                      {tab}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-
-              <Text style={[styles.advLabel, { fontFamily: font.semi }]}>Condition</Text>
-              <View style={styles.chipWrap}>
-                <Pressable
-                  onPress={() => setAdvCondition(null)}
-                  style={[styles.advChip, !advCondition && styles.advChipOn]}
-                >
-                  <Text
-                    style={[styles.advChipTxt, !advCondition && styles.advChipTxtOn, { fontFamily: font.medium }]}
-                  >
-                    Any
-                  </Text>
-                </Pressable>
-                {CONDITIONS.map((c) => (
-                  <Pressable
-                    key={c}
-                    onPress={() => setAdvCondition((prev) => (prev === c ? null : c))}
-                    style={[styles.advChip, advCondition === c && styles.advChipOn]}
-                  >
-                    <Text
-                      style={[styles.advChipTxt, advCondition === c && styles.advChipTxtOn, { fontFamily: font.medium }]}
-                    >
-                      {c}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              <Text style={[styles.advLabel, { fontFamily: font.semi }]}>Language</Text>
-              <TextInput
-                style={[styles.advInput, { fontFamily: font.regular }]}
-                placeholder="e.g. English, Sinhala"
-                placeholderTextColor={themeMuted}
-                value={advLanguage}
-                onChangeText={setAdvLanguage}
-              />
-
-              <Text style={[styles.advLabel, { fontFamily: font.semi }]}>Publication year</Text>
-              <View style={styles.yearRow}>
-                <TextInput
-                  style={[styles.advInput, styles.yearInput, { fontFamily: font.regular }]}
-                  placeholder="From"
-                  placeholderTextColor={themeMuted}
-                  value={advYearMin}
-                  onChangeText={setAdvYearMin}
-                  keyboardType="number-pad"
-                />
-                <Text style={[styles.yearDash, { fontFamily: font.medium }]}>–</Text>
-                <TextInput
-                  style={[styles.advInput, styles.yearInput, { fontFamily: font.regular }]}
-                  placeholder="To"
-                  placeholderTextColor={themeMuted}
-                  value={advYearMax}
-                  onChangeText={setAdvYearMax}
-                  keyboardType="number-pad"
-                />
-              </View>
-            </ScrollView>
-
-            <View style={styles.modalActions}>
-              <Pressable style={[styles.modalBtn, styles.modalBtnGhost]} onPress={clearAdvanced}>
-                <Text style={[styles.modalBtnGhostTxt, { fontFamily: font.bold }]}>Reset panel</Text>
-              </Pressable>
-              <Pressable style={[styles.modalBtn, styles.modalBtnPrimary]} onPress={() => setAdvModalOpen(false)}>
-                <Text style={[styles.modalBtnPrimaryTxt, { fontFamily: font.bold }]}>Apply</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setAdvModalOpen(false)}
+        bookTypeChip={bookTypeChip}
+        setBookTypeChip={setBookTypeChip}
+        advCondition={advCondition}
+        setAdvCondition={setAdvCondition}
+        advLanguage={advLanguage}
+        setAdvLanguage={setAdvLanguage}
+        advYearMin={advYearMin}
+        setAdvYearMin={setAdvYearMin}
+        advYearMax={advYearMax}
+        setAdvYearMax={setAdvYearMax}
+        onResetAdvanced={clearAdvanced}
+      />
     </View>
   );
 }
@@ -1355,119 +1264,6 @@ const styles = StyleSheet.create({
   },
   muted: { fontSize: 15, lineHeight: 22, color: themeMuted },
   error: { color: '#c62828', fontSize: 14, marginTop: 8 },
-  modalRoot: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(16,16,17,0.45)',
-  },
-  modalSheet: {
-    backgroundColor: cascadingWhite,
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    maxHeight: '88%',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: chineseSilver,
-  },
-  modalHandle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: chineseSilver,
-    marginBottom: 14,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  modalTitle: { fontSize: 20, color: themeInk },
-  modalHint: { fontSize: 14, color: themeMuted, lineHeight: 20, marginBottom: 16 },
-  modalScroll: { maxHeight: 360 },
-  advBookTypeScroll: {
-    marginHorizontal: -20,
-    marginBottom: 12,
-  },
-  advBookTypeScrollContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 4,
-  },
-  advLabel: {
-    fontSize: 13,
-    color: themeMuted,
-    marginBottom: 8,
-    marginTop: 4,
-  },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  advChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: dreamland,
-    backgroundColor: themeCard,
-  },
-  advChipOn: {
-    backgroundColor: 'rgba(113,110,255,0.12)',
-    borderColor: themePrimary,
-  },
-  advChipTxt: { fontSize: 14, color: themeMuted, textTransform: 'capitalize' },
-  advChipTxtOn: { color: themePrimary },
-  advInput: {
-    backgroundColor: themePageBg,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: chineseSilver,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: themeInk,
-    marginBottom: 14,
-  },
-  yearRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
-  yearInput: { flex: 1, marginBottom: 0 },
-  yearDash: { fontSize: 18, color: themeMuted },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: chineseSilver,
-  },
-  modalBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 18,
-    alignItems: 'center',
-  },
-  modalBtnGhost: {
-    backgroundColor: cascadingWhite,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: chineseSilver,
-  },
-  modalBtnGhostTxt: { fontSize: 16, color: themeMuted },
-  modalBtnPrimary: {
-    backgroundColor: themePrimary,
-    shadowColor: themePrimary,
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
-  },
-  modalBtnPrimaryTxt: {
-    fontSize: 16,
-    color: cascadingWhite,
-  },
 });
 
 function CarouselPageDots({
