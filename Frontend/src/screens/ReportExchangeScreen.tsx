@@ -15,7 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FormImageAttachment } from '../components/FormImageAttachment';
-import { api, apiErrorMessage } from '../lib/api';
+import { api, apiErrorMessage, apiPostFormData } from '../lib/api';
 import { alertOk } from '../lib/platformAlert';
 import type { ProfileStackParamList } from '../navigation/profileStackTypes';
 import type { RequestsStackParamList } from '../navigation/requestsStackTypes';
@@ -127,8 +127,9 @@ export function ReportExchangeScreen({ navigation, route }: Props) {
     } else {
       form.append('evidencePhoto', { uri: photoUri, name, type } as unknown as Blob);
     }
-    const up = await api.post<{ url: string }>('/api/upload/evidence', form);
-    return up.data.url ?? '';
+    const { data } = await apiPostFormData('/api/upload/evidence', form);
+    const payload = data as { url?: string };
+    return payload.url ?? '';
   };
 
   const submit = async () => {

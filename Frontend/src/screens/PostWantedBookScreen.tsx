@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FormImageAttachment } from '../components/FormImageAttachment';
-import { api, apiErrorMessage } from '../lib/api';
+import { api, apiErrorMessage, apiPostFormData } from '../lib/api';
 import { alertOk } from '../lib/platformAlert';
 import { BOOK_TYPES, type BookType } from '../constants/bookTypes';
 import type { WishlistStackParamList } from '../navigation/wishlistStackTypes';
@@ -134,8 +134,9 @@ export function PostWantedBookScreen({ navigation, route }: Props) {
     } else {
       form.append('image', { uri: photoUri, name, type } as unknown as Blob);
     }
-    const up = await api.post<{ url: string }>('/api/upload/image', form);
-    return up.data.url ?? '';
+    const { data } = await apiPostFormData('/api/upload/image', form);
+    const payload = data as { url?: string };
+    return payload.url ?? '';
   };
 
   const submit = async () => {

@@ -15,7 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FormImageAttachment } from '../components/FormImageAttachment';
-import { api } from '../lib/api';
+import { api, apiPostFormData } from '../lib/api';
 import { alertOk } from '../lib/platformAlert';
 import { BOOK_TYPES, type BookType } from '../constants/bookTypes';
 import { SRI_LANKA_DIVISIONS } from '../constants/sriLankaDivisions';
@@ -139,8 +139,9 @@ export function EditListingScreen({ navigation, route }: Props) {
       form.append('image', { uri: coverUri, name, type } as unknown as Blob);
     }
 
-    const up = await api.post<{ url: string }>('/api/upload/image', form);
-    return up.data.url ?? '';
+    const { data } = await apiPostFormData('/api/upload/image', form);
+    const payload = data as { url?: string };
+    return payload.url ?? '';
   };
 
   const submit = async () => {

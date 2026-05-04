@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { api } from './api';
+import { apiPostFormData } from './api';
 
 /** Uploads a local image URI to the same endpoint used for book photos; returns public URL. */
 export async function uploadChatImage(photoUri: string, photoMime: string | null): Promise<string> {
@@ -18,6 +18,7 @@ export async function uploadChatImage(photoUri: string, photoMime: string | null
   } else {
     form.append('image', { uri: photoUri, name, type } as unknown as Blob);
   }
-  const up = await api.post<{ url: string }>('/api/upload/image', form);
-  return up.data.url ?? '';
+  const { data } = await apiPostFormData('/api/upload/image', form);
+  const payload = data as { url?: string };
+  return payload.url ?? '';
 }

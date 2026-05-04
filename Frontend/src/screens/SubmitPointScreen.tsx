@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CityDictionarySelect } from '../components/CityDictionarySelect';
 import { FormImageAttachment } from '../components/FormImageAttachment';
 import { LocationMapPicker } from '../components/LocationMapPicker';
-import { api, apiErrorMessage } from '../lib/api';
+import { api, apiErrorMessage, apiPostFormData } from '../lib/api';
 import { alertOk } from '../lib/platformAlert';
 import { computeCollectionPointFieldErrors } from '../lib/collectionPointFormRules';
 import { sanitizeMeetupPhoneDigits } from '../lib/meetupFormRules';
@@ -136,8 +136,9 @@ export function SubmitPointScreen({ navigation, route }: Props) {
     } else {
       form.append('locationPhoto', { uri: photoUri, name: fname, type } as unknown as Blob);
     }
-    const up = await api.post<{ url: string }>('/api/upload/location', form);
-    return up.data.url ?? '';
+    const { data } = await apiPostFormData('/api/upload/location', form);
+    const payload = data as { url?: string };
+    return payload.url ?? '';
   };
 
   const submit = async () => {

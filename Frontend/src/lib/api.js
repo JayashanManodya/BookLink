@@ -41,6 +41,8 @@ function stripContentTypeForMultipart(config) {
   if (config.timeout == null) config.timeout = 120_000;
 }
 
+const MULTIPART_TIMEOUT_MS = 120_000;
+
 const baseURL = resolveBaseUrl();
 
 /** Shared client; attach Clerk token via {@link setAuthTokenProvider}. */
@@ -69,6 +71,73 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
+/**
+ * Upload multipart/form-data using `fetch`. On Android release APKs, axios + FormData often fails with ERR_NETWORK while JSON requests succeed.
+ * Uses the same base URL and Clerk token as {@link api}.
+ * @param {string} path e.g. `/api/upload/image`
+ * @param {FormData} formData
+ * @returns {Promise<{ data: unknown }>}
+ */
+export async function apiPostFormData(path, formData) {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const url = `${baseURL}${normalizedPath}`;
+  /** @type {Record<string, string>} */
+  const headers = {};
+  try {
+    const token = await authTokenProvider();
+    if (token) headers.Authorization = `Bearer ${token}`;
+  } catch (err) {
+    console.error('apiPostFormData auth:', err);
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MULTIPART_TIMEOUT_MS);
+  /** @type {Response} */
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+      signal: controller.signal,
+    });
+  } catch (e) {
+    const isAbort =
+      e && typeof e === 'object' && 'name' in e && e.name === 'AbortError';
+    const err = new Error(
+      isAbort
+        ? `timeout of ${MULTIPART_TIMEOUT_MS}ms exceeded`
+        : typeof e?.message === 'string'
+          ? e.message
+          : 'Network Error',
+    );
+    err.code = isAbort ? 'ECONNABORTED' : 'ERR_NETWORK';
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const text = await res.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = { error: text || `Request failed (${res.status})` };
+  }
+
+  if (!res.ok) {
+    const srvMsg =
+      data && typeof data === 'object' && typeof data.error === 'string'
+        ? data.error
+        : `Request failed (${res.status})`;
+    const err = new Error(srvMsg);
+    err.response = { status: res.status, data };
+    throw err;
+  }
+
+  return { data };
+}
+
 /** Separate axios instance with its own token getter (e.g. right after OAuth before global provider updates). */
 export function createAuthAxios(getToken) {
   const instance = axios.create({ baseURL });
@@ -93,23 +162,45 @@ export function createAuthAxios(getToken) {
  * @param {string} [fallback]
  */
 export function apiErrorMessage(error, fallback = 'Something went wrong') {
+  const msgLower =
+    typeof error?.message === 'string' ? error.message.toLowerCase() : '';
+
+  const looksUnreachable =
+    error?.code === 'ERR_NETWORK' ||
+    error?.code === 'ECONNABORTED' ||
+    error?.name === 'AbortError' ||
+    (!error?.response &&
+      (msgLower.includes('network request failed') ||
+        msgLower.includes('failed to fetch'))) ||
+    (axios.isAxiosError(error) &&
+      (error.code === 'ERR_NETWORK' ||
+        error.code === 'ECONNABORTED' ||
+        (!error.response &&
+          typeof error.message === 'string' &&
+          error.message.toLowerCase().includes('network'))));
+
+  if (looksUnreachable) {
+    const hint =
+      'Could not reach the API. Check internet. On EAS builds, confirm EXPO_PUBLIC_API_URL is set in eas.json for your profile and rebuild.';
+    const base =
+      typeof error?.message === 'string' && error.message.trim() ? error.message : 'Network error';
+    return `${base}${base.endsWith('.') ? '' : '.'} ${hint}`;
+  }
+
   if (axios.isAxiosError(error)) {
-    const looksUnreachable =
-      error.code === 'ERR_NETWORK' ||
-      (!error.response &&
-        typeof error.message === 'string' &&
-        error.message.toLowerCase().includes('network'));
-    if (looksUnreachable) {
-      const hint =
-        'Could not reach the API. Check internet. For device builds without EXPO_PUBLIC_API_URL your app falls back to localhost or your PC LAN — upload then fails; set EXPO_PUBLIC_API_URL in .env / EAS and rebuild.';
-      const base = typeof error.message === 'string' && error.message.trim() ? error.message : 'Network error';
-      return `${base}${base.endsWith('.') ? '' : '.'} ${hint}`;
-    }
     const data = error.response?.data;
     if (data && typeof data === 'object' && typeof data.error === 'string') {
       return data.error;
     }
     if (error.message) return error.message;
+  }
+  const plainData = error?.response?.data;
+  if (
+    plainData &&
+    typeof plainData === 'object' &&
+    typeof plainData.error === 'string'
+  ) {
+    return plainData.error;
   }
   if (error instanceof Error) return error.message;
   return fallback;
