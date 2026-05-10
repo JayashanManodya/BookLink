@@ -440,7 +440,7 @@ The **database schema** image lives at **`pics/diagrams/Database_Schema_Diagram.
 
 ## 24. UML diagrams
 
-**System architecture** is shown in **`pics/diagrams/System_Architecture_Diagram.png`** (also in [section 30](#30-screenshots)). Add more coursework exports under **`docs/diagrams/`** (use case, sequence, activity) if required — see optional slots in [section 30](#30-screenshots).
+**System architecture** is shown in **`pics/diagrams/System_Architecture_Diagram.png`** (also in [section 30](#30-screenshots)). Add any other coursework diagrams as PNGs under **`pics/diagrams/`** and embed them in [section 30](#30-screenshots) next to the existing figures.
 
 **Useful diagrams to produce:**
 
@@ -510,6 +510,8 @@ On **GitHub.com**, the images below render as **pictures only** (readers do not 
 
 ### Architecture and database diagrams
 
+All files below live in **`pics/diagrams/`**.
+
 <p align="center">
   <img src="pics/diagrams/System_Architecture_Diagram.png" alt="BookLink system architecture diagram" width="720" />
 </p>
@@ -518,88 +520,7 @@ On **GitHub.com**, the images below render as **pictures only** (readers do not 
   <img src="pics/diagrams/Database_Schema_Diagram.png" alt="BookLink database schema diagram" width="720" />
 </p>
 
-*Optional:* more exports can go in `docs/diagrams/` and embed the same way (`<img … />`).
-
-### Optional diagram slots (`docs/diagrams/`)
-
-| File | Purpose |
-| ---- | ------- |
-| `architecture.png` | Alternate static architecture |
-| `uml-use-case.png` | Use case diagram |
-| `uml-sequence-exchange.png` | Sequence diagram |
-| `uml-activity-request.png` | Activity / request lifecycle |
-
-### App screens (`docs/screenshots/`)
-
-| File | Suggested screen |
-| ---- | ------------------ |
-| `01-landing.png` | Landing / sign-in |
-| `02-browse.png` | Browse listings |
-| `03-book-detail.png` | Book detail |
-| `04-requests.png` | Requests list (sent or received) |
-| `05-exchange-detail.png` | Exchange request detail |
-| `06-chat-inbox.png` | Chats inbox |
-| `07-request-chat.png` | Single request chat thread |
-| `08-wishlist.png` | Wishlist board or thread |
-| `09-profile.png` | Profile / stats |
-| `10-collection-point.png` | Map / collection point (if used) |
-| `11-my-listings.png` | My listings |
-| `12-report-or-review.png` | My reports or write review |
-| `13-device-photo.jpg` | Optional: photo of a phone running the app |
-
-**Embedded previews**
-
-*01 — Landing / sign-in*
-
-![Landing / sign-in](docs/screenshots/01-landing.png)
-
-*02 — Browse*
-
-![Browse](docs/screenshots/02-browse.png)
-
-*03 — Book detail*
-
-![Book detail](docs/screenshots/03-book-detail.png)
-
-*04 — Requests*
-
-![Requests](docs/screenshots/04-requests.png)
-
-*05 — Exchange detail*
-
-![Exchange detail](docs/screenshots/05-exchange-detail.png)
-
-*06 — Chat inbox*
-
-![Chat inbox](docs/screenshots/06-chat-inbox.png)
-
-*07 — Request chat*
-
-![Request chat](docs/screenshots/07-request-chat.png)
-
-*08 — Wishlist*
-
-![Wishlist](docs/screenshots/08-wishlist.png)
-
-*09 — Profile*
-
-![Profile](docs/screenshots/09-profile.png)
-
-*10 — Collection point*
-
-![Collection point](docs/screenshots/10-collection-point.png)
-
-*11 — My listings*
-
-![My listings](docs/screenshots/11-my-listings.png)
-
-*12 — Report or review*
-
-![Report or review](docs/screenshots/12-report-or-review.png)
-
-*13 — Device photo (optional)*
-
-![Device photo](docs/screenshots/13-device-photo.jpg)
+_To add another diagram, place a PNG in `pics/diagrams/` and add a matching `<p align="center"><img src="pics/diagrams/YourFile.png" alt="…" width="720" /></p>` block here._
 
 ## 31. Demo video link
 
