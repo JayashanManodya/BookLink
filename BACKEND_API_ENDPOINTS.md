@@ -12,7 +12,7 @@ Duplicate mount: **`/api/exchange-requests`** and **`/api/requests`** use the **
 
 ---
 
-## Health (shared infrastructure)
+## Health check
 
 | Method | Endpoint | Description | Request body | Response |
 | ------ | -------- | ----------- | ------------ | -------- |
@@ -20,7 +20,7 @@ Duplicate mount: **`/api/exchange-requests`** and **`/api/requests`** use the **
 
 ---
 
-## Member 1 — Review and rating management
+## Reviews and ratings
 
 | Method | Endpoint | Auth | Description | Request body | Response |
 | ------ | -------- | ---- | ----------- | ------------ | -------- |
@@ -32,7 +32,7 @@ Duplicate mount: **`/api/exchange-requests`** and **`/api/requests`** use the **
 
 ---
 
-## Member 2 — Report and complaint management
+## Exchange reports
 
 | Method | Endpoint | Auth | Description | Request body | Response |
 | ------ | -------- | ---- | ----------- | ------------ | -------- |
@@ -45,7 +45,7 @@ Duplicate mount: **`/api/exchange-requests`** and **`/api/requests`** use the **
 
 ---
 
-## Member 3 — Book listing management
+## Book listings
 
 | Method | Endpoint | Auth | Description | Request body | Response |
 | ------ | -------- | ---- | ----------- | ------------ | -------- |
@@ -60,7 +60,7 @@ Allowed **`bookType`** values match [`Backend/src/constants/bookTypes.js`](Backe
 
 ---
 
-## Member 4 — Collection point management
+## Collection points
 
 | Method | Endpoint | Auth | Description | Request body | Response |
 | ------ | -------- | ---- | ----------- | ------------ | -------- |
@@ -73,7 +73,7 @@ Allowed **`bookType`** values match [`Backend/src/constants/bookTypes.js`](Backe
 
 ---
 
-## Member 5 — Exchange request management
+## Exchange requests and chat
 
 Paths work as **`/api/exchange-requests/...`** or **`/api/requests/...`**.
 
@@ -98,7 +98,7 @@ Paths work as **`/api/exchange-requests/...`** or **`/api/requests/...`**.
 
 ---
 
-## Member 6 — Wishlist management
+## Wishlist
 
 | Method | Endpoint | Auth | Description | Request body | Response |
 | ------ | -------- | ---- | ----------- | ------------ | -------- |
@@ -119,7 +119,7 @@ Paths work as **`/api/exchange-requests/...`** or **`/api/requests/...`**.
 
 ---
 
-## Shared — User profile, stats & uploads
+## User profiles, stats & uploads
 
 ### Users (`/api/users`)
 

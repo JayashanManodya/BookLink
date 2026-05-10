@@ -2,7 +2,7 @@
 const MEETUP_PAST_SLACK_MS = 60_000;
 
 /**
- * Parses ISO meetup instant and rejects moments clearly in the past.
+ * onlly feature dats valid
  * @param {unknown} raw
  * @returns {{ ok: true, date: Date } | { ok: false, error: string }}
  */
@@ -22,7 +22,7 @@ export function parseMeetupAtRequiredFuture(raw) {
 }
 
 /**
- * Strip non-digits; require exactly 10 digits (e.g. local mobile).
+ * mobile no exactly 10 digits
  * @param {unknown} raw
  * @returns {{ ok: true, value: string } | { ok: false, error: string }}
  */
