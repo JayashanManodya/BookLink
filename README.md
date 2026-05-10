@@ -397,6 +397,8 @@ BookLink/
 
 ## 20. Architecture diagram
 
+High-level flow (Mermaid):
+
 ```mermaid
 flowchart LR
   subgraph client [Client]
@@ -416,6 +418,12 @@ flowchart LR
   API --> DB
   API --> CDN
 ```
+
+Detailed architecture diagram:
+
+<p align="center">
+  <img src="pics/diagrams/System_Architecture_Diagram.png" alt="BookLink system architecture diagram" width="720" />
+</p>
 
 ## 21. System design
 
@@ -440,7 +448,7 @@ The **database schema** image lives at **`pics/diagrams/Database_Schema_Diagram.
 
 ## 24. UML diagrams
 
-**System architecture** is shown in **`pics/diagrams/System_Architecture_Diagram.png`** (also in [section 30](#30-screenshots)). Add any other coursework diagrams as PNGs under **`pics/diagrams/`** and embed them in [section 30](#30-screenshots) next to the existing figures.
+**System architecture** is shown in **`pics/diagrams/System_Architecture_Diagram.png`** in [section 20](#20-architecture-diagram) and [section 30](#30-screenshots). Add any other coursework diagrams as PNGs under **`pics/diagrams/`** and embed them in [section 30](#30-screenshots) next to the existing figures.
 
 **Useful diagrams to produce:**
 
