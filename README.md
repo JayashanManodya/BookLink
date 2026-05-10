@@ -508,39 +508,28 @@ On **GitHub.com**, the images below render as **pictures only** (readers do not 
   <img src="pics/ss5.png" alt="BookLink app screenshot 5" width="320" />
 </p>
 
-*Optional:* add more files under `docs/screenshots/` or `docs/diagrams/` and embed them the same way (`<img src="…" alt="…" width="320" />`).
+### Architecture and database diagrams
 
-### Diagrams (put files in `docs/diagrams/`)
+<p align="center">
+  <img src="pics/diagrams/System_Architecture_Diagram.png" alt="BookLink system architecture diagram" width="720" />
+</p>
 
-| File to create | What to put there |
-| ---------------- | ----------------- |
-| `architecture.png` | Optional static export of the high-level diagram (in addition to [Mermaid in section 20](#20-architecture-diagram)). |
-| `er-diagram.png` | ER / schema view from your models. |
-| `uml-use-case.png` | Use case diagram. |
-| `uml-sequence-exchange.png` | Sequence diagram (e.g. request or accept flow). |
-| `uml-activity-request.png` | Activity / state flow for exchange requests. |
+<p align="center">
+  <img src="pics/diagrams/Database_Schema_Diagram.png" alt="BookLink database schema diagram" width="720" />
+</p>
 
-**Embedded previews**
+*Optional:* more exports can go in `docs/diagrams/` and embed the same way (`<img … />`).
 
-![Architecture (export)](docs/diagrams/architecture.png)
+### Optional diagram slots (`docs/diagrams/`)
 
-*ER diagram*
+| File | Purpose |
+| ---- | ------- |
+| `architecture.png` | Alternate static architecture |
+| `uml-use-case.png` | Use case diagram |
+| `uml-sequence-exchange.png` | Sequence diagram |
+| `uml-activity-request.png` | Activity / request lifecycle |
 
-![ER diagram](docs/diagrams/er-diagram.png)
-
-*UML — use case*
-
-![UML use case](docs/diagrams/uml-use-case.png)
-
-*UML — sequence (exchange flow)*
-
-![UML sequence](docs/diagrams/uml-sequence-exchange.png)
-
-*UML — activity (request lifecycle)*
-
-![UML activity](docs/diagrams/uml-activity-request.png)
-
-### App screens (put files in `docs/screenshots/`)
+### App screens (`docs/screenshots/`)
 
 | File | Suggested screen |
 | ---- | ------------------ |
